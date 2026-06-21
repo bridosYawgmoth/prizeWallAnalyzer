@@ -1,0 +1,14 @@
+{
+    "name": "bridos/prize-wall-analyzer",
+    "description": "MTG prize wall analyzer API",
+    "type": "project",
+    "require": {
+        "php": "^8.2"
+    },
+    "authors": [
+        {
+            "name": "Konstantinos Giavridis",
+            "email": "constantine_giavridis@hotmail.com"
+        }
+    ]
+}
