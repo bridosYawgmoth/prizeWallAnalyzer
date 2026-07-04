@@ -2,6 +2,11 @@
 framework:
     secret: '%env(APP_SECRET)%'
 
+    http_client:
+        max_host_connections: 10
+        default_options:
+            timeout: 10
+
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 
