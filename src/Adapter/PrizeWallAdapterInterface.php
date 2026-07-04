@@ -2,11 +2,14 @@
 
 namespace App\Adapter;
 
+use App\Dto\PrizeWallItem;
+
 interface PrizeWallAdapterInterface
 {
     /**
      * Fetch and parse a prize wall at the given URL.
-     * Returns raw structured data — shape will be defined when a DTO is introduced.
+     *
+     * @return PrizeWallItem[]
      */
     public function fetch(string $url): array;
 }
