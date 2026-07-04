@@ -25,10 +25,12 @@ KAN-{ticket-number}-{short-description}
 
 ## When creating a branch
 
-Always branch off the latest `1-production`:
+Follow the full **new task workflow** in `new-task-workflow.mdc` (sync prod → Jira ticket → branch).
+
+Branch pattern only:
 
 ```powershell
-git checkout 1-production
-git pull origin 1-production
-git checkout -b KAN-{n}-{description}
+& "C:\Program Files\Git\cmd\git.exe" checkout -b KAN-{n}-{description}
 ```
+
+Always create the branch from an up-to-date `1-production`.
