@@ -1,0 +1,49 @@
+---
+description: Start-of-task workflow — sync prod, Jira ticket, branch
+alwaysApply: true
+---
+
+# New task workflow
+
+When the user asks to **start a new task**, **pick the next task**, or **continue with new work**, run these steps **in order** before writing code.
+
+## 1. Sync production
+
+```powershell
+& "C:\Program Files\Git\cmd\git.exe" checkout 1-production
+& "C:\Program Files\Git\cmd\git.exe" pull origin 1-production
+```
+
+Confirm local `1-production` matches `origin/1-production`.
+
+## 2. Create Jira ticket → In Progress
+
+- **Site:** `https://bridos1234.atlassian.net`
+- **Project:** `KAN`
+- **Issue type:** Task (unless the user specifies Bug/Story)
+
+Use Atlassian MCP:
+
+1. `createJiraIssue` — `cloudId`: `https://bridos1234.atlassian.net`, `projectKey`: `KAN`, clear `summary` and short `description` of the work
+2. `getTransitionsForJiraIssue` on the new key — find the transition to **In Progress**
+3. `transitionJiraIssue` — apply that transition
+
+If the task scope is unclear, propose summary/description and confirm with the user before creating the ticket.
+
+## 3. Create branch
+
+Branch off updated `1-production`. Naming: see `branch-naming.mdc`.
+
+```powershell
+& "C:\Program Files\Git\cmd\git.exe" checkout -b KAN-{n}-{short-description}
+```
+
+Use the **ticket number from step 2** in the branch name. Short description: lowercase, hyphen-separated, 2–4 words.
+
+## After the workflow
+
+Tell the user the Jira key, branch name, and what you are building next. Then proceed with TDD unless they say otherwise.
+
+## End-of-task reminder (not part of “new task”)
+
+When work is complete: tests green → commit (`feat:`/`fix:`) → push → open PR → **user merges** → move Jira to Done.
