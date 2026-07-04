@@ -3,6 +3,7 @@
 namespace App\Tests\Cardmarket;
 
 use App\Cardmarket\CardmarketClient;
+use App\Cardmarket\Enum\HttpMethod;
 use App\Cardmarket\OAuth\OAuthSignerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -51,7 +52,7 @@ final class CardmarketClientTest extends TestCase
         $this->signer
             ->expects($this->once())
             ->method('sign')
-            ->with('GET', $url, $this->isInt(), $this->isString())
+            ->with(HttpMethod::GET, $url, $this->isInt(), $this->isString())
             ->willReturn($authHeader);
 
         $response = $this->createStub(ResponseInterface::class);
@@ -60,7 +61,7 @@ final class CardmarketClientTest extends TestCase
         $this->httpClient
             ->expects($this->once())
             ->method('request')
-            ->with('GET', $url, $this->callback(fn($options) => $options['headers']['Authorization'] === $authHeader))
+            ->with(HttpMethod::GET->value, $url, $this->callback(fn($options) => $options['headers']['Authorization'] === $authHeader))
             ->willReturn($response);
 
         $result = $this->client->get($url);

@@ -2,6 +2,7 @@
 
 namespace App\Cardmarket;
 
+use App\Cardmarket\Enum\HttpMethod;
 use App\Cardmarket\OAuth\OAuthSignerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -15,9 +16,9 @@ final class CardmarketClient
 
     public function get(string $url): array
     {
-        $authHeader = $this->signer->sign('GET', $url, time(), bin2hex(random_bytes(16)));
+        $authHeader = $this->signer->sign(HttpMethod::GET, $url, time(), bin2hex(random_bytes(16)));
 
-        $response = $this->httpClient->request('GET', $url, [
+        $response = $this->httpClient->request(HttpMethod::GET->value, $url, [
             'headers' => ['Authorization' => $authHeader],
         ]);
 

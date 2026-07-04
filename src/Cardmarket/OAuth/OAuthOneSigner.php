@@ -2,7 +2,9 @@
 
 namespace App\Cardmarket\OAuth;
 
-final class OAuthOneSigner
+use App\Cardmarket\Enum\HttpMethod;
+
+final class OAuthOneSigner implements OAuthSignerInterface
 {
     public function __construct(
         private readonly string $appToken,
@@ -12,7 +14,7 @@ final class OAuthOneSigner
     ) {
     }
 
-    public function sign(string $method, string $url, int $timestamp, string $nonce): string
+    public function sign(HttpMethod $method, string $url, int $timestamp, string $nonce): string
     {
         $params    = $this->buildParams($timestamp, $nonce);
         $signature = $this->computeSignature($method, $url, $params);
@@ -41,11 +43,11 @@ final class OAuthOneSigner
     }
 
     /** @param array<string, string> $params */
-    private function computeSignature(string $method, string $url, array $params): string
+    private function computeSignature(HttpMethod $method, string $url, array $params): string
     {
         $paramString = implode('&', $this->encodeParamPairs($params));
 
-        $baseString = strtoupper($method)
+        $baseString = $method->value
             . '&' . rawurlencode($url)
             . '&' . rawurlencode($paramString);
 

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Cardmarket\OAuth;
 
+use App\Cardmarket\Enum\HttpMethod;
 use App\Cardmarket\OAuth\OAuthOneSigner;
 use PHPUnit\Framework\TestCase;
 
@@ -22,7 +23,7 @@ final class OAuthOneSignerTest extends TestCase
     public function testSignReturnsCorrectAuthorizationHeader(): void
     {
         $header = $this->signer->sign(
-            method:    'GET',
+            method:    HttpMethod::GET,
             url:       'https://api.cardmarket.com/ws/v2.0/products/123',
             timestamp: 1700000000,
             nonce:     'abc123',
