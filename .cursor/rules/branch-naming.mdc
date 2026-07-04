@@ -1,0 +1,34 @@
+---
+description: Git branch naming convention for this project
+alwaysApply: true
+---
+
+# Branch naming
+
+All branches must follow the pattern:
+
+```
+KAN-{ticket-number}-{short-description}
+```
+
+## Rules
+
+1. Always prefix with the Jira ticket key (`KAN-{number}`)
+2. Short description: lowercase, hyphen-separated, 2-4 words
+3. No spaces, no uppercase, no special characters
+
+## Examples
+
+- `KAN-4-adapter-factory`
+- `KAN-5-analyze-endpoint`
+- `KAN-6-magiccon-parser`
+
+## When creating a branch
+
+Always branch off the latest `1-production`:
+
+```powershell
+git checkout 1-production
+git pull origin 1-production
+git checkout -b KAN-{n}-{description}
+```
