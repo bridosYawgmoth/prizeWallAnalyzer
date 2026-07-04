@@ -18,23 +18,16 @@ final class AdapterFactoryTest extends TestCase
         $this->factory = new AdapterFactory();
     }
 
-    #[TestWith(['url' => 'https://www.mtgfestivals.com/prize-wall/123'], 'Normal Url for mtgfestivals is correctly identified')]
-    #[TestWith(['url' => 'https://events.mtgfestivals.com/wall'], 'Subdomain for mtgfestivals is correctly identified')]
-    #[TestWith(['url' => 'https://mtgfestivals.com/wall?round=2'], 'If url contains queryparams it is correctly identified')]
-    public function testReturnsPastimeEventsAdapterForMtgFestivalsUrl(string $url): void
+    #[TestWith(['url' => 'https://www.mtgfestivals.com/prize-wall/123', 'expectedClass' => PastimeEventsAdapter::class], 'Normal Url for mtgfestivals is correctly identified')]
+    #[TestWith(['url' => 'https://events.mtgfestivals.com/wall', 'expectedClass' => PastimeEventsAdapter::class], 'Subdomain for mtgfestivals is correctly identified')]
+    #[TestWith(['url' => 'https://mtgfestivals.com/wall?round=2', 'expectedClass' => PastimeEventsAdapter::class], 'If url contains queryparams it is correctly identified')]
+    #[TestWith(['url' => 'https://fanfinity.gg/wall', 'expectedClass' => FanfinityAdapter::class], 'Normal url for fanfinity is correctly identified')]
+    #[TestWith(['url' => 'https://fanfinity.gg/wall?event=rc-london', 'expectedClass' => FanfinityAdapter::class], 'If fanfinity url contains queryparams it is still correctly identified')]
+    public function testReturnsCorrectAdapterForUrl(string $url, string $expectedClass): void
     {
         $adapter = $this->factory->getForUrl($url);
 
-        $this->assertInstanceOf(PastimeEventsAdapter::class, $adapter);
-    }
-
-    #[TestWith(['url' => 'https://fanfinity.gg/wall'], 'Normal url for fanfinity is correctly identified')]
-    #[TestWith(['url' => 'https://fanfinity.gg/wall?event=rc-london'], 'If fanfinity url contains queryparams it is still correctly identified')]
-    public function testReturnsFanfinityAdapterForFanfinityUrl(string $url): void
-    {
-        $adapter = $this->factory->getForUrl($url);
-
-        $this->assertInstanceOf(FanfinityAdapter::class, $adapter);
+        $this->assertInstanceOf($expectedClass, $adapter);
     }
 
     #[TestWith(['url' => 'https://unknown-organizer.com/wall'], 'Completely unknown domain throws exception')]
