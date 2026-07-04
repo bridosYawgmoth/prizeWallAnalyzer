@@ -16,11 +16,18 @@ final class CardmarketClient
 
     public function get(string $url): array
     {
-        $authHeader = $this->signer->sign(HttpMethod::GET, $url, time(), bin2hex(random_bytes(16)));
+        $authHeader = $this->signer->sign(
+            method:    HttpMethod::GET,
+            url:       $url,
+            timestamp: time(),
+            nonce:     bin2hex(random_bytes(16)),
+        );
 
-        $response = $this->httpClient->request(HttpMethod::GET->value, $url, [
-            'headers' => ['Authorization' => $authHeader],
-        ]);
+        $response = $this->httpClient->request(
+            method:  HttpMethod::GET->value,
+            url:     $url,
+            options: ['headers' => ['Authorization' => $authHeader]],
+        );
 
         return $response->toArray();
     }

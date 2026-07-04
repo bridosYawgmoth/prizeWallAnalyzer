@@ -17,7 +17,11 @@ final class OAuthOneSigner implements OAuthSignerInterface
     public function sign(HttpMethod $method, string $url, int $timestamp, string $nonce): string
     {
         $params    = $this->buildParams($timestamp, $nonce);
-        $signature = $this->computeSignature($method, $url, $params);
+        $signature = $this->computeSignature(
+            method: $method,
+            url:    $url,
+            params: $params,
+        );
 
         $params['oauth_signature'] = $signature;
         ksort($params);
