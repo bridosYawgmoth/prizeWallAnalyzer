@@ -1,0 +1,29 @@
+---
+description: Use named arguments when a function has 3 or more parameters
+alwaysApply: true
+---
+
+# Named arguments convention
+
+## Rule
+
+When a function or method has **3 or more parameters**, all call sites must use **named arguments**.
+
+## Also applies when editing
+
+If you edit a function and its parameter count increases from fewer than 3 to 3 or more, update all existing call sites to use named arguments at the same time.
+
+## Examples
+
+```php
+// 2 params — positional is fine
+$signer->sign($method, $url);
+
+// 3 or more params — named arguments required
+$signer->sign(
+    method:    $method,
+    url:       $url,
+    timestamp: time(),
+    nonce:     bin2hex(random_bytes(16)),
+);
+```
