@@ -46,4 +46,13 @@ Tell the user the Jira key, branch name, and what you are building next. Then pr
 
 ## End-of-task reminder (not part of “new task”)
 
-When work is complete: tests green → commit (`feat:`/`fix:`) → push → open PR → **user merges** → move Jira to Done.
+When work is complete, follow these steps **in order**:
+
+1. Tests green
+2. Commit (`feat:`/`fix:`)
+3. Push branch
+4. Open PR against `1-production`
+5. Move Jira ticket → **In Review** (use `transitionJiraIssue`)
+6. Wait — **user reviews and merges the PR**, then notifies you
+7. Move Jira ticket → **Done** (use `transitionJiraIssue`)
+8. Pull `1-production` locally
