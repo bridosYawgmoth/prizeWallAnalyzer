@@ -24,7 +24,7 @@ Confirm local `1-production` matches `origin/1-production`.
 
 Use Atlassian MCP:
 
-1. `createJiraIssue` — `cloudId`: `https://bridos1234.atlassian.net`, `projectKey`: `KAN`, clear `summary` and short `description` of the work
+1. `createJiraIssue` — `cloudId`: `https://bridos1234.atlassian.net`, `projectKey`: `KAN`, clear `summary` and short `description` of the work, `assignee_account_id`: `5c6033acb5e76e7e3c9275c4`
 2. `getTransitionsForJiraIssue` on the new key — find the transition to **In Progress**
 3. `transitionJiraIssue` — apply that transition
 
