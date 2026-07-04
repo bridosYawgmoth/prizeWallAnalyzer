@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Tests\Cardmarket;
+namespace App\Tests\Cardmarket\OAuth;
 
-use App\Cardmarket\OAuthOneSigner;
+use App\Cardmarket\OAuth\OAuthOneSigner;
 use PHPUnit\Framework\TestCase;
 
 final class OAuthOneSignerTest extends TestCase
