@@ -26,7 +26,12 @@ final class OAuthOneSigner implements OAuthSignerInterface
         $params['oauth_signature'] = $signature;
         ksort($params);
 
-        return 'OAuth ' . implode(', ', $this->encodeHeaderParts($params));
+        $headerParts = ['realm="' . rawurlencode($url) . '"'];
+        foreach ($this->encodeHeaderParts($params) as $part) {
+            $headerParts[] = $part;
+        }
+
+        return 'OAuth ' . implode(',', $headerParts);
     }
 
     /** @return array<string, string> */

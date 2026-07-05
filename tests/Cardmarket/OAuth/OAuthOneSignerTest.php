@@ -29,7 +29,7 @@ final class OAuthOneSignerTest extends TestCase
             nonce:     'abc123',
         );
 
-        $expected = 'OAuth oauth_consumer_key="testAppToken", oauth_nonce="abc123", oauth_signature="IFMW2aZBDQrjGqXUEAPw11tyr58%3D", oauth_signature_method="HMAC-SHA1", oauth_timestamp="1700000000", oauth_token="testAccessToken", oauth_version="1.0"';
+        $expected = 'OAuth realm="https%3A%2F%2Fapi.cardmarket.com%2Fws%2Fv2.0%2Fproducts%2F123",oauth_consumer_key="testAppToken",oauth_nonce="abc123",oauth_signature="IFMW2aZBDQrjGqXUEAPw11tyr58%3D",oauth_signature_method="HMAC-SHA1",oauth_timestamp="1700000000",oauth_token="testAccessToken",oauth_version="1.0"';
 
         $this->assertSame($expected, $header);
     }
