@@ -33,4 +33,20 @@ final class OAuthOneSignerTest extends TestCase
 
         $this->assertSame($expected, $header);
     }
+
+    public function testSigningUrlWithQueryParamsWorks(): void
+    {
+        $header = $this->signer->sign(
+            method:    HttpMethod::GET,
+            url:       'https://api.cardmarket.com/ws/v2.0/products/find?search=Foo+Bar&idGame=1',
+            timestamp: 1700000000,
+            nonce:     'abc123',
+        );
+
+        // realm = bare URL without query string
+        // query params are merged into the signature param collection but do NOT appear in the header
+        $expected = 'OAuth realm="https%3A%2F%2Fapi.cardmarket.com%2Fws%2Fv2.0%2Fproducts%2Ffind",oauth_consumer_key="testAppToken",oauth_nonce="abc123",oauth_signature="zWIo83eEn5mJmSaHursEOd3GZ%2FM%3D",oauth_signature_method="HMAC-SHA1",oauth_timestamp="1700000000",oauth_token="testAccessToken",oauth_version="1.0"';
+
+        $this->assertSame($expected, $header);
+    }
 }

@@ -16,22 +16,45 @@ final class OAuthOneSigner implements OAuthSignerInterface
 
     public function sign(HttpMethod $method, string $url, int $timestamp, string $nonce): string
     {
+        $baseUrl     = $this->extractBaseUrl($url);
+        $queryParams = $this->extractQueryParams($url);
+
         $params    = $this->buildParams($timestamp, $nonce);
         $signature = $this->computeSignature(
-            method: $method,
-            url:    $url,
-            params: $params,
+            method:  $method,
+            baseUrl: $baseUrl,
+            params:  array_merge($params, $queryParams),
         );
 
         $params['oauth_signature'] = $signature;
         ksort($params);
 
-        $headerParts = ['realm="' . rawurlencode($url) . '"'];
+        $headerParts = ['realm="' . rawurlencode($baseUrl) . '"'];
         foreach ($this->encodeHeaderParts($params) as $part) {
             $headerParts[] = $part;
         }
 
         return 'OAuth ' . implode(',', $headerParts);
+    }
+
+    private function extractBaseUrl(string $url): string
+    {
+        $parts = parse_url($url);
+
+        return $parts['scheme'] . '://' . $parts['host'] . ($parts['path'] ?? '');
+    }
+
+    /** @return array<string, string> */
+    private function extractQueryParams(string $url): array
+    {
+        $query = parse_url($url, PHP_URL_QUERY);
+        if ($query === null || $query === false || $query === '') {
+            return [];
+        }
+
+        parse_str($query, $params);
+
+        return array_map('strval', $params);
     }
 
     /** @return array<string, string> */
@@ -52,12 +75,13 @@ final class OAuthOneSigner implements OAuthSignerInterface
     }
 
     /** @param array<string, string> $params */
-    private function computeSignature(HttpMethod $method, string $url, array $params): string
+    private function computeSignature(HttpMethod $method, string $baseUrl, array $params): string
     {
+        ksort($params);
         $paramString = implode('&', $this->encodeParamPairs($params));
 
         $baseString = $method->value
-            . '&' . rawurlencode($url)
+            . '&' . rawurlencode($baseUrl)
             . '&' . rawurlencode($paramString);
 
         $signingKey = rawurlencode($this->appSecret) . '&' . rawurlencode($this->accessTokenSecret);
