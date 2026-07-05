@@ -34,7 +34,7 @@ final class OAuthOneSignerTest extends TestCase
         $this->assertSame($expected, $header);
     }
 
-    public function testSigningAUrlWithQueryParamsWorks(): void
+    public function testSigningUrlWithQueryParamsWorks(): void
     {
         $header = $this->signer->sign(
             method:    HttpMethod::GET,
