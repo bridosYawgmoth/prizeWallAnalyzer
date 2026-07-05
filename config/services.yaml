@@ -21,3 +21,12 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    App\Cardmarket\OAuth\OAuthOneSigner:
+        arguments:
+            $appToken:          '%env(CARDMARKET_APP_TOKEN)%'
+            $appSecret:         '%env(CARDMARKET_APP_SECRET)%'
+            $accessToken:       '%env(CARDMARKET_ACCESS_TOKEN)%'
+            $accessTokenSecret: '%env(CARDMARKET_ACCESS_TOKEN_SECRET)%'
+
+    App\Cardmarket\OAuth\OAuthSignerInterface: '@App\Cardmarket\OAuth\OAuthOneSigner'
