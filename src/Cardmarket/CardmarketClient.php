@@ -6,7 +6,7 @@ use App\Cardmarket\Enum\HttpMethod;
 use App\Cardmarket\OAuth\OAuthSignerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-final class CardmarketClient
+final class CardmarketClient implements CardmarketClientInterface
 {
     public function __construct(
         private readonly HttpClientInterface $httpClient,
