@@ -1,10 +1,58 @@
 {
-    "Avatar Play Booster Box": {
-        "cardmarket_product_id": 12345,
-        "cardmarket_name": "Avatar: The Last Airbender Play Booster Display (EN)"
+    "Kamigawa Neon Dynasty Collector Booster": {
+        "cardmarket_product_id": 587688,
+        "cardmarket_name": "Kamigawa: Neon Dynasty Collector Booster"
     },
-    "Some Sealed Product Display": {
-        "cardmarket_product_id": 67890,
-        "cardmarket_name": "Some Sealed Product Display (EN)"
+    "Kamigawa Neon Dynasty Collector Booster Box": {
+        "cardmarket_product_id": 587696,
+        "cardmarket_name": "Kamigawa: Neon Dynasty Collector Booster Box"
+    },
+    "Modern Horizons 3 Collector Booster": {
+        "cardmarket_product_id": 758481,
+        "cardmarket_name": "Modern Horizons 3 Collector Booster"
+    },
+    "Modern Horizons 3 Collector Booster Box": {
+        "cardmarket_product_id": 758483,
+        "cardmarket_name": "Modern Horizons 3 Collector Booster Box"
+    },
+    "Lost Caverns of Ixalan Collector Booster": {
+        "cardmarket_product_id": 734169,
+        "cardmarket_name": "The Lost Caverns of Ixalan Collector Booster"
+    },
+    "Lost Caverns of Ixalan Collector Booster Box": {
+        "cardmarket_product_id": 734175,
+        "cardmarket_name": "The Lost Caverns of Ixalan Collector Booster Box"
+    },
+    "Ravnica Remastered Collector Booster": {
+        "cardmarket_product_id": 737483,
+        "cardmarket_name": "Ravnica Remastered Collector Booster"
+    },
+    "Ravnica Remastered Collector Booster Box": {
+        "cardmarket_product_id": 737484,
+        "cardmarket_name": "Ravnica Remastered Collector Booster Box"
+    },
+    "Final Fantasy Play Booster": {
+        "cardmarket_product_id": 812572,
+        "cardmarket_name": "Magic: The Gathering - FINAL FANTASY Play Booster"
+    },
+    "Final Fantasy Play Booster Box": {
+        "cardmarket_product_id": 812574,
+        "cardmarket_name": "Magic: The Gathering - FINAL FANTASY Play Booster Box"
+    },
+    "Lorwyn Eclipsed Play Booster": {
+        "cardmarket_product_id": 851268,
+        "cardmarket_name": "Lorwyn Eclipsed Play Booster"
+    },
+    "Lorwyn Eclipsed Play Booster Box": {
+        "cardmarket_product_id": 851272,
+        "cardmarket_name": "Lorwyn Eclipsed Play Booster Box"
+    },
+    "Edge of Eternities Play Booster": {
+        "cardmarket_product_id": 813298,
+        "cardmarket_name": "Edge of Eternities Play Booster"
+    },
+    "Edge of Eternities Play Booster Box": {
+        "cardmarket_product_id": 813290,
+        "cardmarket_name": "Edge of Eternities Play Booster Box"
     }
 }
