@@ -30,3 +30,7 @@ services:
             $accessTokenSecret: '%env(CARDMARKET_ACCESS_TOKEN_SECRET)%'
 
     App\Cardmarket\OAuth\OAuthSignerInterface: '@App\Cardmarket\OAuth\OAuthOneSigner'
+
+    App\Cardmarket\CardmarketClientInterface: '@App\Cardmarket\CardmarketClient'
+
+    App\Infrastructure\FileReaderRepositoryInterface: '@App\Infrastructure\LocalFileRepository'
