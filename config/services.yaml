@@ -34,3 +34,5 @@ services:
     App\Cardmarket\CardmarketClientInterface: '@App\Cardmarket\CardmarketClient'
 
     App\Infrastructure\FileReaderRepositoryInterface: '@App\Infrastructure\LocalFileRepository'
+
+    App\Infrastructure\JsonParserInterface: '@App\Infrastructure\JsonParser'
