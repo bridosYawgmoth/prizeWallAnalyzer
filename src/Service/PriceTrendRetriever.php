@@ -51,6 +51,11 @@ class PriceTrendRetriever
         $notFound = [];
 
         foreach ($notInCache as $item) {
+            if (!$this->isInMapping(name: $item->name, mapping: $mapping)) {
+                $notFound[] = $item;
+                continue;
+            }
+
             $trendPrice = $this->readFromCardmarket(name: $item->name, mapping: $mapping);
 
             if ($trendPrice === null) {
@@ -95,6 +100,11 @@ class PriceTrendRetriever
     private function normalizeName(string $name): string
     {
         return strtolower(trim($name));
+    }
+
+    private function isInMapping(string $name, array $mapping): bool
+    {
+        return isset($mapping[$name]);
     }
 
     private function isInCache(string $name, array $cache): bool
