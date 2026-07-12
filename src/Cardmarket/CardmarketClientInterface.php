@@ -6,5 +6,5 @@ namespace App\Cardmarket;
 
 interface CardmarketClientInterface
 {
-    public function get(string $url): array;
+    public function getProduct(int $productId): array;
 }

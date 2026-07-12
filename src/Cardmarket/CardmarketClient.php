@@ -8,13 +8,22 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class CardmarketClient implements CardmarketClientInterface
 {
+    private const string BASE_URL = 'https://apiv2.cardmarket.com/ws/v2.0/output.json/';
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly OAuthSignerInterface $signer,
     ) {
     }
 
-    public function get(string $url): array
+    public function getProduct(int $productId): array
+    {
+        $url = sprintf('%sproducts/%d', self::BASE_URL, $productId);
+
+        return $this->get($url);
+    }
+
+    private function get(string $url): array
     {
         $authHeader = $this->signer->sign(
             method:    HttpMethod::GET,

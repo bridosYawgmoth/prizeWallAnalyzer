@@ -16,6 +16,7 @@ class PriceTrendRetriever
         private readonly FileReaderRepositoryInterface $fileReader,
         private readonly JsonParserInterface $jsonParser,
         private readonly string $cacheDir,
+        private readonly string $mappingDir,
     ) {
     }
 
@@ -23,21 +24,37 @@ class PriceTrendRetriever
      * @param PrizeWallItem[] $items
      * @return PrizeWallItem[]
      */
-    /**
-     * @param PrizeWallItem[] $items
-     * @return PrizeWallItem[]
-     */
     public function getPrices(string $organizer, array $items): array
     {
-        $cache = $this->readCache($organizer);
+        $cache   = $this->readCache($organizer);
+        $mapping = null;
 
         foreach ($items as $item) {
             if ($this->isInCache(name: $item->name, cache: $cache)) {
                 $item->eurPrice = $this->readFromCache(name: $item->name, cache: $cache);
+                continue;
             }
+
+            $mapping ??= $this->readMapping($organizer);
+            $item->eurPrice = $this->readFromCardmarket(name: $item->name, mapping: $mapping);
         }
 
         return $items;
+    }
+
+    private function readFromCardmarket(string $name, array $mapping): float
+    {
+        $productId = $mapping[$name]['cardmarket_product_id'];
+        $response  = $this->cardmarketClient->getProduct(productId: $productId);
+
+        return (float) $response['product']['priceGuide']['TREND'];
+    }
+
+    private function readMapping(string $organizer): array
+    {
+        $path = sprintf('%s/%s/product_mappings.json', $this->mappingDir, $organizer);
+
+        return $this->jsonParser->decode($this->fileReader->read($path));
     }
 
     private function readFromCache(string $name, array $cache): float

@@ -30,7 +30,65 @@ final class PriceTrendRetrieverTest extends TestCase
             fileReader:       $this->fileReader,
             jsonParser:       $this->jsonParser,
             cacheDir:         '/tmp/prices',
+            mappingDir:       '/tmp/mappings',
         );
+    }
+
+    public function testGetPricesFetchesFromCardmarketWhenItemIsNotInCache(): void
+    {
+        $item = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
+
+        $emptyCache  = '{}';
+        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"}}';
+        $mappingData = [
+            'Kamigawa Neon Dynasty Collector Booster' => [
+                'cardmarket_product_id' => 587688,
+                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
+            ],
+        ];
+        $cmResponse = [
+            'product' => [
+                'idProduct'  => 587688,
+                'priceGuide' => ['TREND' => 18.50],
+            ],
+        ];
+
+        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
+        $readReturns = [$emptyCache, $mappingJson];
+
+        $this->fileReader
+            ->expects($this->exactly(2))
+            ->method('read')
+            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
+                static $callIndex = 0;
+                $this->assertSame($readPaths[$callIndex], $path);
+
+                return $readReturns[$callIndex++];
+            });
+
+        $decodeInputs  = [$emptyCache, $mappingJson];
+        $decodeReturns = [[], $mappingData];
+
+        $this->jsonParser
+            ->expects($this->exactly(2))
+            ->method('decode')
+            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
+                static $callIndex = 0;
+                $this->assertSame($decodeInputs[$callIndex], $json);
+
+                return $decodeReturns[$callIndex++];
+            });
+
+        $this->cardmarketClient
+            ->expects($this->once())
+            ->method('getProduct')
+            ->with(587688)
+            ->willReturn($cmResponse);
+
+        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
+
+        $this->assertCount(1, $result);
+        $this->assertSame(18.50, $result[0]->eurPrice);
     }
 
     public function testGetPricesReturnsCachedTrendPriceWithoutCallingCardmarketApi(): void
@@ -54,7 +112,7 @@ final class PriceTrendRetrieverTest extends TestCase
 
         $this->cardmarketClient
             ->expects($this->never())
-            ->method('get');
+            ->method('getProduct');
 
         $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
 

@@ -23,9 +23,9 @@ final class CardmarketClientTest extends TestCase
         $this->client     = new CardmarketClient($this->httpClient, $this->signer);
     }
 
-    public function testGetReturnsDecodedJsonArray(): void
+    public function testGetProductReturnsDecodedJsonArray(): void
     {
-        $url      = 'https://api.cardmarket.com/ws/v2.0/output.json/products/1';
+        $url        = 'https://apiv2.cardmarket.com/ws/v2.0/output.json/products/1';
         $authHeader = 'OAuth oauth_consumer_key="testAppToken"';
 
         $expectedResponse = [
@@ -64,7 +64,7 @@ final class CardmarketClientTest extends TestCase
             ->with(HttpMethod::GET->value, $url, $this->callback(fn($options) => $options['headers']['Authorization'] === $authHeader))
             ->willReturn($response);
 
-        $result = $this->client->get($url);
+        $result = $this->client->getProduct(productId: 1);
 
         $this->assertSame($expectedResponse, $result);
         $this->assertSame('Black Lotus', $result['product']['enName']);
