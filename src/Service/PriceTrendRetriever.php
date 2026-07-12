@@ -47,23 +47,35 @@ class PriceTrendRetriever
             );
         }
 
-        $mapping = $this->readMapping($organizer);
+        $mapping  = $this->readMapping($organizer);
+        $notFound = [];
 
         foreach ($notInCache as $item) {
-            $item->eurPrice = $this->readFromCardmarket(name: $item->name, mapping: $mapping);
+            $trendPrice = $this->readFromCardmarket(name: $item->name, mapping: $mapping);
+
+            if ($trendPrice === null) {
+                $notFound[] = $item;
+                continue;
+            }
+
+            $item->eurPrice = $trendPrice;
             $found[] = $item;
         }
 
         return new PriceRetrievalResult(
             prizeWallItems:         $found,
-            prizeWallItemsNotFound: [],
+            prizeWallItemsNotFound: $notFound,
         );
     }
 
-    private function readFromCardmarket(string $name, array $mapping): float
+    private function readFromCardmarket(string $name, array $mapping): ?float
     {
         $productId = $mapping[$name]['cardmarket_product_id'];
         $response  = $this->cardmarketClient->getProduct(productId: $productId);
+
+        if (!isset($response['product']['priceGuide']['TREND'])) {
+            return null;
+        }
 
         return (float) $response['product']['priceGuide']['TREND'];
     }
