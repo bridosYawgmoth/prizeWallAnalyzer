@@ -87,8 +87,9 @@ final class PriceTrendRetrieverTest extends TestCase
 
         $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
 
-        $this->assertCount(1, $result);
-        $this->assertSame(18.50, $result[0]->eurPrice);
+        $this->assertCount(1, $result->prizeWallItems);
+        $this->assertCount(0, $result->prizeWallItemsNotFound);
+        $this->assertSame(18.50, $result->prizeWallItems[0]->eurPrice);
     }
 
     public function testGetPricesReturnsCachedTrendPriceWithoutCallingCardmarketApi(): void
@@ -116,7 +117,8 @@ final class PriceTrendRetrieverTest extends TestCase
 
         $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
 
-        $this->assertCount(1, $result);
-        $this->assertSame(18.50, $result[0]->eurPrice);
+        $this->assertCount(1, $result->prizeWallItems);
+        $this->assertCount(0, $result->prizeWallItemsNotFound);
+        $this->assertSame(18.50, $result->prizeWallItems[0]->eurPrice);
     }
 }

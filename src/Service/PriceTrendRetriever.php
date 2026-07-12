@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Cardmarket\CardmarketClientInterface;
+use App\Dto\PriceRetrievalResult;
 use App\Dto\PrizeWallItem;
 use App\Infrastructure\FileReaderRepositoryInterface;
 use App\Infrastructure\JsonParserInterface;
@@ -22,24 +23,41 @@ class PriceTrendRetriever
 
     /**
      * @param PrizeWallItem[] $items
-     * @return PrizeWallItem[]
      */
-    public function getPrices(string $organizer, array $items): array
+    public function getPrices(string $organizer, array $items): PriceRetrievalResult
     {
-        $cache   = $this->readCache($organizer);
-        $mapping = null;
+        $cache      = $this->readCache($organizer);
+        $found      = [];
+        $notInCache = [];
 
         foreach ($items as $item) {
             if ($this->isInCache(name: $item->name, cache: $cache)) {
                 $item->eurPrice = $this->readFromCache(name: $item->name, cache: $cache);
+                $found[] = $item;
                 continue;
             }
 
-            $mapping ??= $this->readMapping($organizer);
-            $item->eurPrice = $this->readFromCardmarket(name: $item->name, mapping: $mapping);
+            $notInCache[] = $item;
         }
 
-        return $items;
+        if ($notInCache === []) {
+            return new PriceRetrievalResult(
+                prizeWallItems:         $found,
+                prizeWallItemsNotFound: [],
+            );
+        }
+
+        $mapping = $this->readMapping($organizer);
+
+        foreach ($notInCache as $item) {
+            $item->eurPrice = $this->readFromCardmarket(name: $item->name, mapping: $mapping);
+            $found[] = $item;
+        }
+
+        return new PriceRetrievalResult(
+            prizeWallItems:         $found,
+            prizeWallItemsNotFound: [],
+        );
     }
 
     private function readFromCardmarket(string $name, array $mapping): float
