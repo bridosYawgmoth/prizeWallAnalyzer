@@ -23,19 +23,42 @@ class PriceTrendRetriever
      * @param PrizeWallItem[] $items
      * @return PrizeWallItem[]
      */
+    /**
+     * @param PrizeWallItem[] $items
+     * @return PrizeWallItem[]
+     */
     public function getPrices(string $organizer, array $items): array
     {
-        $cachePath = sprintf('%s/%s.json', $this->cacheDir, $organizer);
-        $cache     = $this->jsonParser->decode($this->fileReader->read($cachePath));
+        $cache = $this->readCache($organizer);
 
         foreach ($items as $item) {
-            $key = strtolower(trim($item->name));
-
-            if (isset($cache[$key])) {
-                $item->eurPrice = (float) $cache[$key];
+            if ($this->isInCache(name: $item->name, cache: $cache)) {
+                $item->eurPrice = $this->readFromCache(name: $item->name, cache: $cache);
             }
         }
 
         return $items;
+    }
+
+    private function readFromCache(string $name, array $cache): float
+    {
+        return (float) $cache[$this->normalizeName($name)];
+    }
+
+    private function normalizeName(string $name): string
+    {
+        return strtolower(trim($name));
+    }
+
+    private function isInCache(string $name, array $cache): bool
+    {
+        return isset($cache[$this->normalizeName($name)]);
+    }
+
+    private function readCache(string $organizer): array
+    {
+        $path = sprintf('%s/%s.json', $this->cacheDir, $organizer);
+
+        return $this->jsonParser->decode($this->fileReader->read($path));
     }
 }
