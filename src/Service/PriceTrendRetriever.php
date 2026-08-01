@@ -26,31 +26,61 @@ class PriceTrendRetriever
      */
     public function getPrices(string $organizer, array $items): PriceRetrievalResult
     {
-        $cache      = $this->readCache($organizer);
-        $found      = [];
-        $notInCache = [];
+        [$pricedFromCache, $needingLookup] = $this->priceFromCache(
+            items: $items,
+            cache: $this->readCache($organizer),
+        );
 
-        foreach ($items as $item) {
-            if ($this->isInCache(name: $item->name, cache: $cache)) {
-                $item->eurPrice = $this->readFromCache(name: $item->name, cache: $cache);
-                $found[] = $item;
-                continue;
-            }
-
-            $notInCache[] = $item;
-        }
-
-        if ($notInCache === []) {
+        if ($needingLookup === []) {
             return new PriceRetrievalResult(
-                prizeWallItems:         $found,
+                prizeWallItems:         $pricedFromCache,
                 prizeWallItemsNotFound: [],
             );
         }
 
-        $mapping  = $this->readMapping($organizer);
+        [$pricedFromCardmarket, $notFound] = $this->priceFromCardmarket(
+            items:   $needingLookup,
+            mapping: $this->readMapping($organizer),
+        );
+
+        return new PriceRetrievalResult(
+            prizeWallItems:         [...$pricedFromCache, ...$pricedFromCardmarket],
+            prizeWallItemsNotFound: $notFound,
+        );
+    }
+
+    /**
+     * @param PrizeWallItem[] $items
+     * @return array{0: PrizeWallItem[], 1: PrizeWallItem[]} priced items, then items needing a Cardmarket lookup
+     */
+    private function priceFromCache(array $items, array $cache): array
+    {
+        $priced        = [];
+        $needingLookup = [];
+
+        foreach ($items as $item) {
+            if (!$this->isInCache(name: $item->name, cache: $cache)) {
+                $needingLookup[] = $item;
+                continue;
+            }
+
+            $item->eurPrice = $this->readFromCache(name: $item->name, cache: $cache);
+            $priced[] = $item;
+        }
+
+        return [$priced, $needingLookup];
+    }
+
+    /**
+     * @param PrizeWallItem[] $items
+     * @return array{0: PrizeWallItem[], 1: PrizeWallItem[]} priced items, then items without a usable price
+     */
+    private function priceFromCardmarket(array $items, array $mapping): array
+    {
+        $priced   = [];
         $notFound = [];
 
-        foreach ($notInCache as $item) {
+        foreach ($items as $item) {
             if (!$this->isInMapping(name: $item->name, mapping: $mapping)) {
                 $notFound[] = $item;
                 continue;
@@ -64,13 +94,10 @@ class PriceTrendRetriever
             }
 
             $item->eurPrice = $trendPrice;
-            $found[] = $item;
+            $priced[] = $item;
         }
 
-        return new PriceRetrievalResult(
-            prizeWallItems:         $found,
-            prizeWallItemsNotFound: $notFound,
-        );
+        return [$priced, $notFound];
     }
 
     private function readFromCardmarket(string $name, array $mapping): ?float
