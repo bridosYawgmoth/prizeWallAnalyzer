@@ -11,6 +11,7 @@ use App\Infrastructure\JsonParserInterface;
 use App\Service\PriceTrendRetriever;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 final class PriceTrendRetrieverTest extends TestCase
 {
@@ -195,6 +196,59 @@ final class PriceTrendRetrieverTest extends TestCase
             ->method('getProduct')
             ->with(587688)
             ->willReturn([]);
+
+        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
+
+        $this->assertCount(0, $result->prizeWallItems);
+        $this->assertCount(1, $result->prizeWallItemsNotFound);
+        $this->assertSame($item, $result->prizeWallItemsNotFound[0]);
+        $this->assertNull($result->prizeWallItemsNotFound[0]->eurPrice);
+    }
+
+    public function testGetPricesMovesItemToNotFoundWhenCardmarketRequestFails(): void
+    {
+        $item = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
+
+        $emptyCache  = '{}';
+        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"}}';
+        $mappingData = [
+            'Kamigawa Neon Dynasty Collector Booster' => [
+                'cardmarket_product_id' => 587688,
+                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
+            ],
+        ];
+
+        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
+        $readReturns = [$emptyCache, $mappingJson];
+
+        $this->fileReader
+            ->expects($this->exactly(2))
+            ->method('read')
+            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
+                static $callIndex = 0;
+                $this->assertSame($readPaths[$callIndex], $path);
+
+                return $readReturns[$callIndex++];
+            });
+
+        $decodeInputs  = [$emptyCache, $mappingJson];
+        $decodeReturns = [[], $mappingData];
+
+        $this->jsonParser
+            ->expects($this->exactly(2))
+            ->method('decode')
+            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
+                static $callIndex = 0;
+                $this->assertSame($decodeInputs[$callIndex], $json);
+
+                return $decodeReturns[$callIndex++];
+            });
+
+        $this->cardmarketClient
+            ->expects($this->once())
+            ->method('getProduct')
+            ->with(587688)
+            ->willThrowException(new RuntimeException('Cardmarket request failed'));
 
         $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
 
