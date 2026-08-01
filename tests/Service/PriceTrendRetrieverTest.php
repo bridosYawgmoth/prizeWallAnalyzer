@@ -11,7 +11,6 @@ use App\Infrastructure\JsonParserInterface;
 use App\Service\PriceTrendRetriever;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 final class PriceTrendRetrieverTest extends TestCase
 {
@@ -205,7 +204,7 @@ final class PriceTrendRetrieverTest extends TestCase
         $this->assertNull($result->prizeWallItemsNotFound[0]->eurPrice);
     }
 
-    public function testGetPricesMovesItemToNotFoundWhenCardmarketRequestFails(): void
+    public function testGetPricesMovesItemToNotFoundWhenCardmarketReturnsErrorPayload(): void
     {
         $item = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
 
@@ -248,7 +247,7 @@ final class PriceTrendRetrieverTest extends TestCase
             ->expects($this->once())
             ->method('getProduct')
             ->with(587688)
-            ->willThrowException(new RuntimeException('Cardmarket request failed'));
+            ->willReturn(['errors' => [['message' => 'No product found', 'code' => 404]]]);
 
         $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
 

@@ -7,6 +7,8 @@ use App\Cardmarket\Enum\HttpMethod;
 use App\Cardmarket\OAuth\OAuthSignerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\Exception\JsonException;
+use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
@@ -69,5 +71,38 @@ final class CardmarketClientTest extends TestCase
         $this->assertSame($expectedResponse, $result);
         $this->assertSame('Black Lotus', $result['product']['enName']);
         $this->assertSame(50500.0, $result['product']['priceGuide']['TREND']);
+    }
+
+    public function testGetProductReturnsEmptyArrayWhenTransportFails(): void
+    {
+        $this->signer
+            ->expects($this->once())
+            ->method('sign')
+            ->willReturn('OAuth oauth_consumer_key="testAppToken"');
+
+        $this->httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->willThrowException(new TransportException('Connection timed out'));
+
+        $this->assertSame([], $this->client->getProduct(productId: 1));
+    }
+
+    public function testGetProductReturnsEmptyArrayWhenResponseCannotBeDecoded(): void
+    {
+        $this->signer
+            ->expects($this->once())
+            ->method('sign')
+            ->willReturn('OAuth oauth_consumer_key="testAppToken"');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('toArray')->willThrowException(new JsonException('Invalid JSON'));
+
+        $this->httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->willReturn($response);
+
+        $this->assertSame([], $this->client->getProduct(productId: 1));
     }
 }

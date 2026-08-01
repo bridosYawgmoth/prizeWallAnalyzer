@@ -9,7 +9,6 @@ use App\Dto\PriceRetrievalResult;
 use App\Dto\PrizeWallItem;
 use App\Infrastructure\FileReaderRepositoryInterface;
 use App\Infrastructure\JsonParserInterface;
-use Exception;
 
 class PriceTrendRetriever
 {
@@ -77,12 +76,7 @@ class PriceTrendRetriever
     private function readFromCardmarket(string $name, array $mapping): ?float
     {
         $productId = $mapping[$name]['cardmarket_product_id'];
-
-        try {
-            $response = $this->cardmarketClient->getProduct(productId: $productId);
-        } catch (Exception) {
-            return null;
-        }
+        $response  = $this->cardmarketClient->getProduct(productId: $productId);
 
         if (!isset($response['product']['priceGuide']['TREND'])) {
             return null;

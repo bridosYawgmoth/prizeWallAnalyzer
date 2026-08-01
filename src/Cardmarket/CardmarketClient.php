@@ -4,6 +4,7 @@ namespace App\Cardmarket;
 
 use App\Cardmarket\Enum\HttpMethod;
 use App\Cardmarket\OAuth\OAuthSignerInterface;
+use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class CardmarketClient implements CardmarketClientInterface
@@ -32,12 +33,16 @@ final class CardmarketClient implements CardmarketClientInterface
             nonce:     bin2hex(random_bytes(16)),
         );
 
-        $response = $this->httpClient->request(
-            method:  HttpMethod::GET->value,
-            url:     $url,
-            options: ['headers' => ['Authorization' => $authHeader]],
-        );
+        try {
+            $response = $this->httpClient->request(
+                method:  HttpMethod::GET->value,
+                url:     $url,
+                options: ['headers' => ['Authorization' => $authHeader]],
+            );
 
-        return $response->toArray();
+            return $response->toArray();
+        } catch (ExceptionInterface) {
+            return [];
+        }
     }
 }
