@@ -69,7 +69,7 @@ final class FanfinityPrizeWallParserTest extends TestCase
     #[TestWith(['notDerived' => 'Jumpstart Booster Box - Avatar: The Last Airbender'], 'Jumpstart boosters get no box')]
     #[TestWith(['notDerived' => 'Bundle Box - Aetherdrift "Finish Line"'], 'Bundles get no box')]
     #[TestWith(['notDerived' => 'Prerelease Kit Box - Lorwyn Eclipsed'], 'Prerelease kits get no box')]
-    public function testDoesNotDeriveBoxesForNonPlayOrCollectorBoosters(string $notDerived): void
+    public function testDoesNotDeriveBoxesForNonPlayAndNonCollectorBoosters(string $notDerived): void
     {
         $items = $this->parser->parse($this->fixture());
 
