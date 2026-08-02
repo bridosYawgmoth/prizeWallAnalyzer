@@ -9,7 +9,7 @@ final class ByTagExclusion implements ExclusionRuleInterface
     /**
      * Accessory brands and product lines that carry no sealed-product value.
      */
-    public const array DEFAULT_EXCLUDED_TAGS = [
+    private const array DEFAULT_EXCLUDED_TAGS = [
         'Ultimate Guard',
         'HEAVY PLAY',
         'Playmat',

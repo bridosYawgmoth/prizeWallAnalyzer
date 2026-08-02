@@ -6,10 +6,7 @@ namespace App\Adapter\ExclusionRules;
 
 final class ByNameExclusion implements ExclusionRuleInterface
 {
-    /**
-     * Accessory lines the wall does not tag reliably, so they have to be caught on the name instead.
-     */
-    public const array DEFAULT_EXCLUDED_NAMES = [
+    private const array DEFAULT_EXCLUDED_NAMES = [
         'Sleeves',
         'Xenoskin',
         'Sidewinder',
