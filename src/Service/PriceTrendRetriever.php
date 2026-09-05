@@ -4,20 +4,15 @@ declare(strict_types=1);
 
 namespace App\Service;
 
-use App\Cardmarket\CardmarketClientInterface;
 use App\Dto\PriceRetrievalResult;
 use App\Dto\PrizeWallItem;
-use App\Infrastructure\FileReaderRepositoryInterface;
-use App\Infrastructure\JsonParserInterface;
 
 class PriceTrendRetriever
 {
     public function __construct(
-        private readonly CardmarketClientInterface $cardmarketClient,
-        private readonly FileReaderRepositoryInterface $fileReader,
-        private readonly JsonParserInterface $jsonParser,
-        private readonly string $cacheDir,
-        private readonly string $mappingDir,
+        private readonly PriceCacheInterface $priceCache,
+        private readonly ProductMappingRepositoryInterface $productMappings,
+        private readonly TrendPriceProviderInterface $trendPriceProvider,
     ) {
     }
 
@@ -27,8 +22,8 @@ class PriceTrendRetriever
     public function getPrices(string $organizer, array $items): PriceRetrievalResult
     {
         [$pricedFromCache, $needingLookup] = $this->priceFromCache(
-            items: $items,
-            cache: $this->readCache($organizer),
+            organizer: $organizer,
+            items:     $items,
         );
 
         if ($needingLookup === []) {
@@ -39,8 +34,8 @@ class PriceTrendRetriever
         }
 
         [$pricedFromCardmarket, $notFound] = $this->priceFromCardmarket(
-            items:   $needingLookup,
-            mapping: $this->readMapping($organizer),
+            organizer: $organizer,
+            items:     $needingLookup,
         );
 
         return new PriceRetrievalResult(
@@ -53,18 +48,20 @@ class PriceTrendRetriever
      * @param PrizeWallItem[] $items
      * @return array{0: PrizeWallItem[], 1: PrizeWallItem[]} priced items, then items needing a Cardmarket lookup
      */
-    private function priceFromCache(array $items, array $cache): array
+    private function priceFromCache(string $organizer, array $items): array
     {
+        $cachedPrices = $this->priceCache->pricesFor($organizer, $this->namesOf($items));
+
         $priced        = [];
         $needingLookup = [];
 
         foreach ($items as $item) {
-            if (!$this->isInCache(name: $item->name, cache: $cache)) {
+            if (!isset($cachedPrices[$item->name])) {
                 $needingLookup[] = $item;
                 continue;
             }
 
-            $item->eurPrice = $this->readFromCache(name: $item->name, cache: $cache);
+            $item->eurPrice = $cachedPrices[$item->name];
             $priced[] = $item;
         }
 
@@ -75,18 +72,17 @@ class PriceTrendRetriever
      * @param PrizeWallItem[] $items
      * @return array{0: PrizeWallItem[], 1: PrizeWallItem[]} priced items, then items without a usable price
      */
-    private function priceFromCardmarket(array $items, array $mapping): array
+    private function priceFromCardmarket(string $organizer, array $items): array
     {
+        $productIds = $this->productMappings->productIdsFor($organizer, $this->namesOf($items));
+
         $priced   = [];
         $notFound = [];
 
         foreach ($items as $item) {
-            if (!$this->isInMapping(name: $item->name, mapping: $mapping)) {
-                $notFound[] = $item;
-                continue;
-            }
-
-            $trendPrice = $this->readFromCardmarket(name: $item->name, mapping: $mapping);
+            $trendPrice = isset($productIds[$item->name])
+                ? $this->trendPriceProvider->trendPriceFor($productIds[$item->name])
+                : null;
 
             if ($trendPrice === null) {
                 $notFound[] = $item;
@@ -100,49 +96,12 @@ class PriceTrendRetriever
         return [$priced, $notFound];
     }
 
-    private function readFromCardmarket(string $name, array $mapping): ?float
+    /**
+     * @param PrizeWallItem[] $items
+     * @return string[]
+     */
+    private function namesOf(array $items): array
     {
-        $productId = $mapping[$name]['cardmarket_product_id'];
-        $response  = $this->cardmarketClient->getProduct(productId: $productId);
-
-        if (!isset($response['product']['priceGuide']['TREND'])) {
-            return null;
-        }
-
-        return (float) $response['product']['priceGuide']['TREND'];
-    }
-
-    private function readMapping(string $organizer): array
-    {
-        $path = sprintf('%s/%s/product_mappings.json', $this->mappingDir, $organizer);
-
-        return $this->jsonParser->decode($this->fileReader->read($path));
-    }
-
-    private function readFromCache(string $name, array $cache): float
-    {
-        return (float) $cache[$this->normalizeName($name)];
-    }
-
-    private function normalizeName(string $name): string
-    {
-        return strtolower(trim($name));
-    }
-
-    private function isInMapping(string $name, array $mapping): bool
-    {
-        return isset($mapping[$name]);
-    }
-
-    private function isInCache(string $name, array $cache): bool
-    {
-        return isset($cache[$this->normalizeName($name)]);
-    }
-
-    private function readCache(string $organizer): array
-    {
-        $path = sprintf('%s/%s.json', $this->cacheDir, $organizer);
-
-        return $this->jsonParser->decode($this->fileReader->read($path));
+        return array_map(static fn (PrizeWallItem $item): string => $item->name, $items);
     }
 }

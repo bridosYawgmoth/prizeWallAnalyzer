@@ -7,6 +7,8 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    app.price_cache_dir:     '%kernel.project_dir%/var/prices'
+    app.product_mapping_dir: '%kernel.project_dir%/config/mappings'
 
 services:
     # default configuration for services in *this* file
@@ -36,3 +38,17 @@ services:
     App\Infrastructure\FileReaderRepositoryInterface: '@App\Infrastructure\LocalFileRepository'
 
     App\Infrastructure\JsonParserInterface: '@App\Infrastructure\JsonParser'
+
+    App\Service\PriceCache:
+        arguments:
+            $cacheDir: '%app.price_cache_dir%'
+
+    App\Service\ProductMappingRepository:
+        arguments:
+            $mappingDir: '%app.product_mapping_dir%'
+
+    App\Service\PriceCacheInterface: '@App\Service\PriceCache'
+
+    App\Service\ProductMappingRepositoryInterface: '@App\Service\ProductMappingRepository'
+
+    App\Service\TrendPriceProviderInterface: '@App\Service\CardmarketTrendPriceProvider'
