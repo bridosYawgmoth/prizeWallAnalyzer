@@ -39,6 +39,10 @@ final class ProductMappingRepository implements ProductMappingRepositoryInterfac
     {
         $path = sprintf('%s/%s/product_mappings.json', $this->mappingDir, $organizer);
 
+        if (!$this->fileReader->exists($path)) {
+            return [];
+        }
+
         return $this->jsonParser->decode($this->fileReader->read($path));
     }
 }

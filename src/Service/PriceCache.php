@@ -39,6 +39,10 @@ final class PriceCache implements PriceCacheInterface
     {
         $path = sprintf('%s/%s.json', $this->cacheDir, $organizer);
 
+        if (!$this->fileReader->exists($path)) {
+            return [];
+        }
+
         return $this->jsonParser->decode($this->fileReader->read($path));
     }
 

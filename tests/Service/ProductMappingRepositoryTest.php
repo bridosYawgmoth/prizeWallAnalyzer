@@ -7,55 +7,107 @@ namespace App\Tests\Service;
 use App\Infrastructure\FileReaderRepositoryInterface;
 use App\Infrastructure\JsonParserInterface;
 use App\Service\ProductMappingRepository;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class ProductMappingRepositoryTest extends TestCase
 {
-    private FileReaderRepositoryInterface&MockObject $fileReader;
-    private JsonParserInterface&MockObject $jsonParser;
-    private ProductMappingRepository $productMappings;
-
-    protected function setUp(): void
-    {
-        $this->fileReader = $this->createMock(FileReaderRepositoryInterface::class);
-        $this->jsonParser = $this->createMock(JsonParserInterface::class);
-
-        $this->productMappings = new ProductMappingRepository(
-            fileReader: $this->fileReader,
-            jsonParser: $this->jsonParser,
-            mappingDir: '/tmp/mappings',
-        );
-    }
+    private const string MAPPING_DIR = '/tmp/mappings';
 
     public function testProductIdsForReadsTheMappingFileOfTheOrganizer(): void
     {
-        $this->stubMapping(
-            path: '/tmp/mappings/pastimeevents/product_mappings.json',
-            json: '{}',
-            data: [],
+        $fileReader = $this->createMock(FileReaderRepositoryInterface::class);
+        $fileReader->method('exists')->willReturn(true);
+        $fileReader
+            ->expects($this->once())
+            ->method('read')
+            ->with(self::MAPPING_DIR . '/pastimeevents/product_mappings.json')
+            ->willReturn('{}');
+
+        $productMappings = new ProductMappingRepository(
+            fileReader: $fileReader,
+            jsonParser: $this->jsonParserReturning([]),
+            mappingDir: self::MAPPING_DIR,
         );
 
-        $this->productMappings->productIdsFor(
+        $productMappings->productIdsFor(
             organizer: 'pastimeevents',
             names: ['Kamigawa Neon Dynasty Collector Booster'],
         );
     }
 
-    public function testProductIdsForReturnsProductIdKeyedByRequestedName(): void
+    public function testProductIdsForReadsTheMappingOnceRegardlessOfTheNumberOfNames(): void
     {
-        $this->stubMapping(
-            path: '/tmp/mappings/pastimeevents/product_mappings.json',
-            json: '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688}}',
-            data: [
-                'Kamigawa Neon Dynasty Collector Booster' => [
-                    'cardmarket_product_id' => 587688,
-                    'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
-                ],
-            ],
+        $json = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688}}';
+
+        $fileReader = $this->createMock(FileReaderRepositoryInterface::class);
+        $fileReader->method('exists')->willReturn(true);
+        $fileReader
+            ->expects($this->once())
+            ->method('read')
+            ->willReturn($json);
+
+        $jsonParser = $this->createMock(JsonParserInterface::class);
+        $jsonParser
+            ->expects($this->once())
+            ->method('decode')
+            ->with($json)
+            ->willReturn([
+                'Kamigawa Neon Dynasty Collector Booster' => ['cardmarket_product_id' => 587688],
+            ]);
+
+        $productMappings = new ProductMappingRepository(
+            fileReader: $fileReader,
+            jsonParser: $jsonParser,
+            mappingDir: self::MAPPING_DIR,
         );
 
-        $productIds = $this->productMappings->productIdsFor(
+        $productMappings->productIdsFor(
+            organizer: 'pastimeevents',
+            names: [
+                'Kamigawa Neon Dynasty Collector Booster',
+                'Modern Horizons 3 Collector Booster',
+                'Bloomburrow Play Booster',
+                'Foundations Jumpstart Booster',
+            ],
+        );
+    }
+
+    public function testProductIdsForReturnsNoProductIdsWhenTheMappingFileDoesNotExist(): void
+    {
+        $fileReader = $this->createMock(FileReaderRepositoryInterface::class);
+        $fileReader
+            ->expects($this->once())
+            ->method('exists')
+            ->with(self::MAPPING_DIR . '/unknownorganizer/product_mappings.json')
+            ->willReturn(false);
+        $fileReader
+            ->expects($this->never())
+            ->method('read');
+
+        $productMappings = new ProductMappingRepository(
+            fileReader: $fileReader,
+            jsonParser: $this->jsonParserReturning([]),
+            mappingDir: self::MAPPING_DIR,
+        );
+
+        $productIds = $productMappings->productIdsFor(
+            organizer: 'unknownorganizer',
+            names: ['Kamigawa Neon Dynasty Collector Booster'],
+        );
+
+        $this->assertSame([], $productIds);
+    }
+
+    public function testProductIdsForReturnsProductIdKeyedByRequestedName(): void
+    {
+        $productMappings = $this->productMappingsContaining([
+            'Kamigawa Neon Dynasty Collector Booster' => [
+                'cardmarket_product_id' => 587688,
+                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
+            ],
+        ]);
+
+        $productIds = $productMappings->productIdsFor(
             organizer: 'pastimeevents',
             names: ['Kamigawa Neon Dynasty Collector Booster'],
         );
@@ -65,15 +117,11 @@ final class ProductMappingRepositoryTest extends TestCase
 
     public function testProductIdsForOmitsNamesMissingFromTheMapping(): void
     {
-        $this->stubMapping(
-            path: '/tmp/mappings/pastimeevents/product_mappings.json',
-            json: '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688}}',
-            data: [
-                'Kamigawa Neon Dynasty Collector Booster' => ['cardmarket_product_id' => 587688],
-            ],
-        );
+        $productMappings = $this->productMappingsContaining([
+            'Kamigawa Neon Dynasty Collector Booster' => ['cardmarket_product_id' => 587688],
+        ]);
 
-        $productIds = $this->productMappings->productIdsFor(
+        $productIds = $productMappings->productIdsFor(
             organizer: 'pastimeevents',
             names: ['Kamigawa Neon Dynasty Collector Booster', 'Unknown Product'],
         );
@@ -83,15 +131,11 @@ final class ProductMappingRepositoryTest extends TestCase
 
     public function testProductIdsForMatchesMappedNamesExactly(): void
     {
-        $this->stubMapping(
-            path: '/tmp/mappings/pastimeevents/product_mappings.json',
-            json: '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688}}',
-            data: [
-                'Kamigawa Neon Dynasty Collector Booster' => ['cardmarket_product_id' => 587688],
-            ],
-        );
+        $productMappings = $this->productMappingsContaining([
+            'Kamigawa Neon Dynasty Collector Booster' => ['cardmarket_product_id' => 587688],
+        ]);
 
-        $productIds = $this->productMappings->productIdsFor(
+        $productIds = $productMappings->productIdsFor(
             organizer: 'pastimeevents',
             names: ['kamigawa neon dynasty collector booster'],
         );
@@ -101,17 +145,13 @@ final class ProductMappingRepositoryTest extends TestCase
 
     public function testProductIdsForOmitsEntriesWithoutACardmarketProductId(): void
     {
-        $this->stubMapping(
-            path: '/tmp/mappings/pastimeevents/product_mappings.json',
-            json: '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"}}',
-            data: [
-                'Kamigawa Neon Dynasty Collector Booster' => [
-                    'cardmarket_name' => 'Kamigawa: Neon Dynasty Collector Booster',
-                ],
+        $productMappings = $this->productMappingsContaining([
+            'Kamigawa Neon Dynasty Collector Booster' => [
+                'cardmarket_name' => 'Kamigawa: Neon Dynasty Collector Booster',
             ],
-        );
+        ]);
 
-        $productIds = $this->productMappings->productIdsFor(
+        $productIds = $productMappings->productIdsFor(
             organizer: 'pastimeevents',
             names: ['Kamigawa Neon Dynasty Collector Booster'],
         );
@@ -121,15 +161,11 @@ final class ProductMappingRepositoryTest extends TestCase
 
     public function testProductIdsForReturnsProductIdsAsIntegers(): void
     {
-        $this->stubMapping(
-            path: '/tmp/mappings/pastimeevents/product_mappings.json',
-            json: '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":"587688"}}',
-            data: [
-                'Kamigawa Neon Dynasty Collector Booster' => ['cardmarket_product_id' => '587688'],
-            ],
-        );
+        $productMappings = $this->productMappingsContaining([
+            'Kamigawa Neon Dynasty Collector Booster' => ['cardmarket_product_id' => '587688'],
+        ]);
 
-        $productIds = $this->productMappings->productIdsFor(
+        $productIds = $productMappings->productIdsFor(
             organizer: 'pastimeevents',
             names: ['Kamigawa Neon Dynasty Collector Booster'],
         );
@@ -137,43 +173,30 @@ final class ProductMappingRepositoryTest extends TestCase
         $this->assertSame(['Kamigawa Neon Dynasty Collector Booster' => 587688], $productIds);
     }
 
-    public function testProductIdsForReadsTheMappingOnceRegardlessOfTheNumberOfNames(): void
+    /**
+     * @param array<string, array<string, mixed>> $mapping decoded mapping contents, keyed by exact name
+     */
+    private function productMappingsContaining(array $mapping): ProductMappingRepository
     {
-        $this->stubMapping(
-            path: '/tmp/mappings/pastimeevents/product_mappings.json',
-            json: '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688},"Modern Horizons 3 Collector Booster":{"cardmarket_product_id":758481}}',
-            data: [
-                'Kamigawa Neon Dynasty Collector Booster' => ['cardmarket_product_id' => 587688],
-                'Modern Horizons 3 Collector Booster'     => ['cardmarket_product_id' => 758481],
-            ],
-        );
+        $fileReader = $this->createStub(FileReaderRepositoryInterface::class);
+        $fileReader->method('exists')->willReturn(true);
+        $fileReader->method('read')->willReturn('{}');
 
-        $productIds = $this->productMappings->productIdsFor(
-            organizer: 'pastimeevents',
-            names: ['Kamigawa Neon Dynasty Collector Booster', 'Modern Horizons 3 Collector Booster'],
-        );
-
-        $this->assertSame(
-            [
-                'Kamigawa Neon Dynasty Collector Booster' => 587688,
-                'Modern Horizons 3 Collector Booster'     => 758481,
-            ],
-            $productIds,
+        return new ProductMappingRepository(
+            fileReader: $fileReader,
+            jsonParser: $this->jsonParserReturning($mapping),
+            mappingDir: self::MAPPING_DIR,
         );
     }
 
-    private function stubMapping(string $path, string $json, array $data): void
+    /**
+     * @param array<string, array<string, mixed>> $data
+     */
+    private function jsonParserReturning(array $data): JsonParserInterface
     {
-        $this->fileReader
-            ->expects($this->once())
-            ->method('read')
-            ->with($path)
-            ->willReturn($json);
+        $jsonParser = $this->createStub(JsonParserInterface::class);
+        $jsonParser->method('decode')->willReturn($data);
 
-        $this->jsonParser
-            ->expects($this->once())
-            ->method('decode')
-            ->with($json)
-            ->willReturn($data);
+        return $jsonParser;
     }
 }

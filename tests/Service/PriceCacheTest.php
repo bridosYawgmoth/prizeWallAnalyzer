@@ -16,6 +16,7 @@ final class PriceCacheTest extends TestCase
     public function testPricesForReadsTheCacheFileOfTheOrganizer(): void
     {
         $fileReader = $this->createMock(FileReaderRepositoryInterface::class);
+        $fileReader->method('exists')->willReturn(true);
         $fileReader
             ->expects($this->once())
             ->method('read')
@@ -39,6 +40,7 @@ final class PriceCacheTest extends TestCase
         $json = '{"kamigawa neon dynasty collector booster":18.50}';
 
         $fileReader = $this->createMock(FileReaderRepositoryInterface::class);
+        $fileReader->method('exists')->willReturn(true);
         $fileReader
             ->expects($this->once())
             ->method('read')
@@ -66,6 +68,32 @@ final class PriceCacheTest extends TestCase
                 'Foundations Jumpstart Booster',
             ],
         );
+    }
+
+    public function testPricesForReturnsNoPricesWhenTheCacheFileDoesNotExist(): void
+    {
+        $fileReader = $this->createMock(FileReaderRepositoryInterface::class);
+        $fileReader
+            ->expects($this->once())
+            ->method('exists')
+            ->with(self::CACHE_DIR . '/pastimeevents.json')
+            ->willReturn(false);
+        $fileReader
+            ->expects($this->never())
+            ->method('read');
+
+        $priceCache = new PriceCache(
+            fileReader: $fileReader,
+            jsonParser: $this->jsonParserReturning([]),
+            cacheDir:   self::CACHE_DIR,
+        );
+
+        $prices = $priceCache->pricesFor(
+            organizer: 'pastimeevents',
+            names: ['Kamigawa Neon Dynasty Collector Booster'],
+        );
+
+        $this->assertSame([], $prices);
     }
 
     public function testPricesForReturnsCachedPriceKeyedByRequestedName(): void
@@ -146,6 +174,7 @@ final class PriceCacheTest extends TestCase
     private function priceCacheContaining(array $cache): PriceCache
     {
         $fileReader = $this->createStub(FileReaderRepositoryInterface::class);
+        $fileReader->method('exists')->willReturn(true);
         $fileReader->method('read')->willReturn('{}');
 
         return new PriceCache(
