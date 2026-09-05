@@ -7,47 +7,72 @@ namespace App\Tests\Service;
 use App\Infrastructure\FileReaderRepositoryInterface;
 use App\Infrastructure\JsonParserInterface;
 use App\Service\PriceCache;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class PriceCacheTest extends TestCase
 {
-    private FileReaderRepositoryInterface&MockObject $fileReader;
-    private JsonParserInterface&MockObject $jsonParser;
-    private PriceCache $priceCache;
-
-    protected function setUp(): void
-    {
-        $this->fileReader = $this->createMock(FileReaderRepositoryInterface::class);
-        $this->jsonParser = $this->createMock(JsonParserInterface::class);
-
-        $this->priceCache = new PriceCache(
-            fileReader: $this->fileReader,
-            jsonParser: $this->jsonParser,
-            cacheDir:   '/tmp/prices',
-        );
-    }
+    private const string CACHE_DIR = '/tmp/prices';
 
     public function testPricesForReadsTheCacheFileOfTheOrganizer(): void
     {
-        $this->stubCache(
-            path: '/tmp/prices/pastimeevents.json',
-            json: '{}',
-            data: [],
+        $fileReader = $this->createMock(FileReaderRepositoryInterface::class);
+        $fileReader
+            ->expects($this->once())
+            ->method('read')
+            ->with(self::CACHE_DIR . '/pastimeevents.json')
+            ->willReturn('{}');
+
+        $priceCache = new PriceCache(
+            fileReader: $fileReader,
+            jsonParser: $this->jsonParserReturning([]),
+            cacheDir:   self::CACHE_DIR,
         );
 
-        $this->priceCache->pricesFor(organizer: 'pastimeevents', names: ['Kamigawa Neon Dynasty Collector Booster']);
+        $priceCache->pricesFor(
+            organizer: 'pastimeevents',
+            names: ['Kamigawa Neon Dynasty Collector Booster'],
+        );
+    }
+
+    public function testPricesForReadsTheCacheOnceRegardlessOfTheNumberOfNames(): void
+    {
+        $json = '{"kamigawa neon dynasty collector booster":18.50}';
+
+        $fileReader = $this->createMock(FileReaderRepositoryInterface::class);
+        $fileReader
+            ->expects($this->once())
+            ->method('read')
+            ->willReturn($json);
+
+        $jsonParser = $this->createMock(JsonParserInterface::class);
+        $jsonParser
+            ->expects($this->once())
+            ->method('decode')
+            ->with($json)
+            ->willReturn(['kamigawa neon dynasty collector booster' => 18.50]);
+
+        $priceCache = new PriceCache(
+            fileReader: $fileReader,
+            jsonParser: $jsonParser,
+            cacheDir:   self::CACHE_DIR,
+        );
+
+        $priceCache->pricesFor(
+            organizer: 'pastimeevents',
+            names: [
+                'Kamigawa Neon Dynasty Collector Booster',
+                'Modern Horizons 3 Collector Booster',
+                'Bloomburrow Play Booster',
+                'Foundations Jumpstart Booster',
+            ],
+        );
     }
 
     public function testPricesForReturnsCachedPriceKeyedByRequestedName(): void
     {
-        $this->stubCache(
-            path: '/tmp/prices/pastimeevents.json',
-            json: '{"kamigawa neon dynasty collector booster":18.50}',
-            data: ['kamigawa neon dynasty collector booster' => 18.50],
-        );
+        $priceCache = $this->priceCacheContaining(['kamigawa neon dynasty collector booster' => 18.50]);
 
-        $prices = $this->priceCache->pricesFor(
+        $prices = $priceCache->pricesFor(
             organizer: 'pastimeevents',
             names: ['Kamigawa Neon Dynasty Collector Booster'],
         );
@@ -57,13 +82,9 @@ final class PriceCacheTest extends TestCase
 
     public function testPricesForMatchesCachedNamesRegardlessOfCase(): void
     {
-        $this->stubCache(
-            path: '/tmp/prices/pastimeevents.json',
-            json: '{"kamigawa neon dynasty collector booster":18.50}',
-            data: ['kamigawa neon dynasty collector booster' => 18.50],
-        );
+        $priceCache = $this->priceCacheContaining(['kamigawa neon dynasty collector booster' => 18.50]);
 
-        $prices = $this->priceCache->pricesFor(
+        $prices = $priceCache->pricesFor(
             organizer: 'pastimeevents',
             names: ['KAMIGAWA NEON DYNASTY COLLECTOR BOOSTER'],
         );
@@ -73,13 +94,9 @@ final class PriceCacheTest extends TestCase
 
     public function testPricesForIgnoresSurroundingWhitespaceInRequestedNames(): void
     {
-        $this->stubCache(
-            path: '/tmp/prices/pastimeevents.json',
-            json: '{"kamigawa neon dynasty collector booster":18.50}',
-            data: ['kamigawa neon dynasty collector booster' => 18.50],
-        );
+        $priceCache = $this->priceCacheContaining(['kamigawa neon dynasty collector booster' => 18.50]);
 
-        $prices = $this->priceCache->pricesFor(
+        $prices = $priceCache->pricesFor(
             organizer: 'pastimeevents',
             names: ['  Kamigawa Neon Dynasty Collector Booster  '],
         );
@@ -89,13 +106,9 @@ final class PriceCacheTest extends TestCase
 
     public function testPricesForOmitsNamesWithoutACachedPrice(): void
     {
-        $this->stubCache(
-            path: '/tmp/prices/pastimeevents.json',
-            json: '{"kamigawa neon dynasty collector booster":18.50}',
-            data: ['kamigawa neon dynasty collector booster' => 18.50],
-        );
+        $priceCache = $this->priceCacheContaining(['kamigawa neon dynasty collector booster' => 18.50]);
 
-        $prices = $this->priceCache->pricesFor(
+        $prices = $priceCache->pricesFor(
             organizer: 'pastimeevents',
             names: ['Kamigawa Neon Dynasty Collector Booster', 'Modern Horizons 3 Collector Booster'],
         );
@@ -105,13 +118,9 @@ final class PriceCacheTest extends TestCase
 
     public function testPricesForReturnsNoPricesWhenTheCacheIsEmpty(): void
     {
-        $this->stubCache(
-            path: '/tmp/prices/pastimeevents.json',
-            json: '{}',
-            data: [],
-        );
+        $priceCache = $this->priceCacheContaining([]);
 
-        $prices = $this->priceCache->pricesFor(
+        $prices = $priceCache->pricesFor(
             organizer: 'pastimeevents',
             names: ['Kamigawa Neon Dynasty Collector Booster'],
         );
@@ -121,13 +130,9 @@ final class PriceCacheTest extends TestCase
 
     public function testPricesForReturnsCachedPricesAsFloats(): void
     {
-        $this->stubCache(
-            path: '/tmp/prices/pastimeevents.json',
-            json: '{"kamigawa neon dynasty collector booster":18}',
-            data: ['kamigawa neon dynasty collector booster' => 18],
-        );
+        $priceCache = $this->priceCacheContaining(['kamigawa neon dynasty collector booster' => 18]);
 
-        $prices = $this->priceCache->pricesFor(
+        $prices = $priceCache->pricesFor(
             organizer: 'pastimeevents',
             names: ['Kamigawa Neon Dynasty Collector Booster'],
         );
@@ -135,43 +140,29 @@ final class PriceCacheTest extends TestCase
         $this->assertSame(['Kamigawa Neon Dynasty Collector Booster' => 18.0], $prices);
     }
 
-    public function testPricesForReadsTheCacheOnceRegardlessOfTheNumberOfNames(): void
+    /**
+     * @param array<string, float|int> $cache decoded cache contents, keyed by normalized name
+     */
+    private function priceCacheContaining(array $cache): PriceCache
     {
-        $this->stubCache(
-            path: '/tmp/prices/pastimeevents.json',
-            json: '{"kamigawa neon dynasty collector booster":18.50,"modern horizons 3 collector booster":22.00}',
-            data: [
-                'kamigawa neon dynasty collector booster' => 18.50,
-                'modern horizons 3 collector booster'     => 22.00,
-            ],
-        );
+        $fileReader = $this->createStub(FileReaderRepositoryInterface::class);
+        $fileReader->method('read')->willReturn('{}');
 
-        $prices = $this->priceCache->pricesFor(
-            organizer: 'pastimeevents',
-            names: ['Kamigawa Neon Dynasty Collector Booster', 'Modern Horizons 3 Collector Booster'],
-        );
-
-        $this->assertSame(
-            [
-                'Kamigawa Neon Dynasty Collector Booster' => 18.50,
-                'Modern Horizons 3 Collector Booster'     => 22.00,
-            ],
-            $prices,
+        return new PriceCache(
+            fileReader: $fileReader,
+            jsonParser: $this->jsonParserReturning($cache),
+            cacheDir:   self::CACHE_DIR,
         );
     }
 
-    private function stubCache(string $path, string $json, array $data): void
+    /**
+     * @param array<string, float|int> $data
+     */
+    private function jsonParserReturning(array $data): JsonParserInterface
     {
-        $this->fileReader
-            ->expects($this->once())
-            ->method('read')
-            ->with($path)
-            ->willReturn($json);
+        $jsonParser = $this->createStub(JsonParserInterface::class);
+        $jsonParser->method('decode')->willReturn($data);
 
-        $this->jsonParser
-            ->expects($this->once())
-            ->method('decode')
-            ->with($json)
-            ->willReturn($data);
+        return $jsonParser;
     }
 }
