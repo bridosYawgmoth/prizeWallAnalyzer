@@ -4,86 +4,44 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
-use App\Cardmarket\CardmarketClientInterface;
 use App\Dto\PrizeWallItem;
-use App\Infrastructure\FileReaderRepositoryInterface;
-use App\Infrastructure\JsonParserInterface;
+use App\Service\PriceCacheInterface;
 use App\Service\PriceTrendRetriever;
+use App\Service\ProductMappingRepositoryInterface;
+use App\Service\TrendPriceProviderInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class PriceTrendRetrieverTest extends TestCase
 {
-    private CardmarketClientInterface&MockObject $cardmarketClient;
-    private FileReaderRepositoryInterface&MockObject $fileReader;
-    private JsonParserInterface&MockObject $jsonParser;
+    private const string KAMIGAWA = 'Kamigawa Neon Dynasty Collector Booster';
+    private const string MODERN_HORIZONS = 'Modern Horizons 3 Collector Booster';
+
+    private PriceCacheInterface&MockObject $priceCache;
+    private ProductMappingRepositoryInterface&MockObject $productMappings;
+    private TrendPriceProviderInterface&MockObject $trendPriceProvider;
     private PriceTrendRetriever $retriever;
 
     protected function setUp(): void
     {
-        $this->cardmarketClient = $this->createMock(CardmarketClientInterface::class);
-        $this->fileReader       = $this->createMock(FileReaderRepositoryInterface::class);
-        $this->jsonParser       = $this->createMock(JsonParserInterface::class);
+        $this->priceCache         = $this->createMock(PriceCacheInterface::class);
+        $this->productMappings    = $this->createMock(ProductMappingRepositoryInterface::class);
+        $this->trendPriceProvider = $this->createMock(TrendPriceProviderInterface::class);
 
         $this->retriever = new PriceTrendRetriever(
-            cardmarketClient: $this->cardmarketClient,
-            fileReader:       $this->fileReader,
-            jsonParser:       $this->jsonParser,
-            cacheDir:         '/tmp/prices',
-            mappingDir:       '/tmp/mappings',
+            priceCache:         $this->priceCache,
+            productMappings:    $this->productMappings,
+            trendPriceProvider: $this->trendPriceProvider,
         );
     }
 
-    public function testGetPricesFetchesFromCardmarketWhenItemIsNotInCache(): void
+    public function testGetPricesReturnsCachedPriceWithoutConsultingCardmarket(): void
     {
-        $item = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
+        $item = new PrizeWallItem(name: self::KAMIGAWA, tixPrice: 10);
 
-        $emptyCache  = '{}';
-        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"}}';
-        $mappingData = [
-            'Kamigawa Neon Dynasty Collector Booster' => [
-                'cardmarket_product_id' => 587688,
-                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
-            ],
-        ];
-        $cmResponse = [
-            'product' => [
-                'idProduct'  => 587688,
-                'priceGuide' => ['TREND' => 18.50],
-            ],
-        ];
-
-        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
-        $readReturns = [$emptyCache, $mappingJson];
-
-        $this->fileReader
-            ->expects($this->exactly(2))
-            ->method('read')
-            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
-                static $callIndex = 0;
-                $this->assertSame($readPaths[$callIndex], $path);
-
-                return $readReturns[$callIndex++];
-            });
-
-        $decodeInputs  = [$emptyCache, $mappingJson];
-        $decodeReturns = [[], $mappingData];
-
-        $this->jsonParser
-            ->expects($this->exactly(2))
-            ->method('decode')
-            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
-                static $callIndex = 0;
-                $this->assertSame($decodeInputs[$callIndex], $json);
-
-                return $decodeReturns[$callIndex++];
-            });
-
-        $this->cardmarketClient
-            ->expects($this->once())
-            ->method('getProduct')
-            ->with(587688)
-            ->willReturn($cmResponse);
+        $this->stubCachedPrices(names: [self::KAMIGAWA], prices: [self::KAMIGAWA => 18.50]);
+        $this->productMappings->expects($this->never())->method('productIdsFor');
+        $this->trendPriceProvider->expects($this->never())->method('trendPriceFor');
 
         $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
 
@@ -92,248 +50,17 @@ final class PriceTrendRetrieverTest extends TestCase
         $this->assertSame(18.50, $result->prizeWallItems[0]->eurPrice);
     }
 
-    public function testGetPricesMovesItemToNotFoundWhenCardmarketTrendPriceIsMissing(): void
+    public function testGetPricesReturnsTwoCachedPricesWithoutConsultingCardmarket(): void
     {
-        $item = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
+        $item1 = new PrizeWallItem(name: self::KAMIGAWA, tixPrice: 10);
+        $item2 = new PrizeWallItem(name: self::MODERN_HORIZONS, tixPrice: 12);
 
-        $emptyCache  = '{}';
-        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"}}';
-        $mappingData = [
-            'Kamigawa Neon Dynasty Collector Booster' => [
-                'cardmarket_product_id' => 587688,
-                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
-            ],
-        ];
-        $cmResponse = [
-            'product' => [
-                'idProduct'  => 587688,
-                'priceGuide' => [],
-            ],
-        ];
-
-        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
-        $readReturns = [$emptyCache, $mappingJson];
-
-        $this->fileReader
-            ->expects($this->exactly(2))
-            ->method('read')
-            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
-                static $callIndex = 0;
-                $this->assertSame($readPaths[$callIndex], $path);
-
-                return $readReturns[$callIndex++];
-            });
-
-        $decodeInputs  = [$emptyCache, $mappingJson];
-        $decodeReturns = [[], $mappingData];
-
-        $this->jsonParser
-            ->expects($this->exactly(2))
-            ->method('decode')
-            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
-                static $callIndex = 0;
-                $this->assertSame($decodeInputs[$callIndex], $json);
-
-                return $decodeReturns[$callIndex++];
-            });
-
-        $this->cardmarketClient
-            ->expects($this->once())
-            ->method('getProduct')
-            ->with(587688)
-            ->willReturn($cmResponse);
-
-        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
-
-        $this->assertCount(0, $result->prizeWallItems);
-        $this->assertCount(1, $result->prizeWallItemsNotFound);
-        $this->assertSame($item, $result->prizeWallItemsNotFound[0]);
-        $this->assertNull($result->prizeWallItemsNotFound[0]->eurPrice);
-    }
-
-    public function testGetPricesMovesItemToNotFoundWhenCardmarketReturnsNoProduct(): void
-    {
-        $item = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
-
-        $emptyCache  = '{}';
-        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"}}';
-        $mappingData = [
-            'Kamigawa Neon Dynasty Collector Booster' => [
-                'cardmarket_product_id' => 587688,
-                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
-            ],
-        ];
-
-        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
-        $readReturns = [$emptyCache, $mappingJson];
-
-        $this->fileReader
-            ->expects($this->exactly(2))
-            ->method('read')
-            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
-                static $callIndex = 0;
-                $this->assertSame($readPaths[$callIndex], $path);
-
-                return $readReturns[$callIndex++];
-            });
-
-        $decodeInputs  = [$emptyCache, $mappingJson];
-        $decodeReturns = [[], $mappingData];
-
-        $this->jsonParser
-            ->expects($this->exactly(2))
-            ->method('decode')
-            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
-                static $callIndex = 0;
-                $this->assertSame($decodeInputs[$callIndex], $json);
-
-                return $decodeReturns[$callIndex++];
-            });
-
-        $this->cardmarketClient
-            ->expects($this->once())
-            ->method('getProduct')
-            ->with(587688)
-            ->willReturn([]);
-
-        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
-
-        $this->assertCount(0, $result->prizeWallItems);
-        $this->assertCount(1, $result->prizeWallItemsNotFound);
-        $this->assertSame($item, $result->prizeWallItemsNotFound[0]);
-        $this->assertNull($result->prizeWallItemsNotFound[0]->eurPrice);
-    }
-
-    public function testGetPricesMovesItemToNotFoundWhenCardmarketReturnsErrorPayload(): void
-    {
-        $item = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
-
-        $emptyCache  = '{}';
-        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"}}';
-        $mappingData = [
-            'Kamigawa Neon Dynasty Collector Booster' => [
-                'cardmarket_product_id' => 587688,
-                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
-            ],
-        ];
-
-        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
-        $readReturns = [$emptyCache, $mappingJson];
-
-        $this->fileReader
-            ->expects($this->exactly(2))
-            ->method('read')
-            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
-                static $callIndex = 0;
-                $this->assertSame($readPaths[$callIndex], $path);
-
-                return $readReturns[$callIndex++];
-            });
-
-        $decodeInputs  = [$emptyCache, $mappingJson];
-        $decodeReturns = [[], $mappingData];
-
-        $this->jsonParser
-            ->expects($this->exactly(2))
-            ->method('decode')
-            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
-                static $callIndex = 0;
-                $this->assertSame($decodeInputs[$callIndex], $json);
-
-                return $decodeReturns[$callIndex++];
-            });
-
-        $this->cardmarketClient
-            ->expects($this->once())
-            ->method('getProduct')
-            ->with(587688)
-            ->willReturn(['errors' => [['message' => 'No product found', 'code' => 404]]]);
-
-        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
-
-        $this->assertCount(0, $result->prizeWallItems);
-        $this->assertCount(1, $result->prizeWallItemsNotFound);
-        $this->assertSame($item, $result->prizeWallItemsNotFound[0]);
-        $this->assertNull($result->prizeWallItemsNotFound[0]->eurPrice);
-    }
-
-    public function testGetPricesMovesItemToNotFoundWhenMappingEntryIsMissing(): void
-    {
-        $item = new PrizeWallItem(name: 'Unknown Product', tixPrice: 10);
-
-        $emptyCache  = '{}';
-        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"}}';
-        $mappingData = [
-            'Kamigawa Neon Dynasty Collector Booster' => [
-                'cardmarket_product_id' => 587688,
-                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
-            ],
-        ];
-
-        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
-        $readReturns = [$emptyCache, $mappingJson];
-
-        $this->fileReader
-            ->expects($this->exactly(2))
-            ->method('read')
-            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
-                static $callIndex = 0;
-                $this->assertSame($readPaths[$callIndex], $path);
-
-                return $readReturns[$callIndex++];
-            });
-
-        $decodeInputs  = [$emptyCache, $mappingJson];
-        $decodeReturns = [[], $mappingData];
-
-        $this->jsonParser
-            ->expects($this->exactly(2))
-            ->method('decode')
-            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
-                static $callIndex = 0;
-                $this->assertSame($decodeInputs[$callIndex], $json);
-
-                return $decodeReturns[$callIndex++];
-            });
-
-        $this->cardmarketClient
-            ->expects($this->never())
-            ->method('getProduct');
-
-        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
-
-        $this->assertCount(0, $result->prizeWallItems);
-        $this->assertCount(1, $result->prizeWallItemsNotFound);
-        $this->assertSame($item, $result->prizeWallItemsNotFound[0]);
-        $this->assertNull($result->prizeWallItemsNotFound[0]->eurPrice);
-    }
-
-    public function testGetPricesReturnsTwoItemsFromCacheWithoutCallingCardmarketApi(): void
-    {
-        $item1 = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
-        $item2 = new PrizeWallItem(name: 'Modern Horizons 3 Collector Booster', tixPrice: 12);
-
-        $cachedJson = '{"kamigawa neon dynasty collector booster":18.50,"modern horizons 3 collector booster":22.00}';
-        $cachedData = [
-            'kamigawa neon dynasty collector booster' => 18.50,
-            'modern horizons 3 collector booster'       => 22.00,
-        ];
-
-        $this->fileReader
-            ->expects($this->once())
-            ->method('read')
-            ->with('/tmp/prices/pastimeevents.json')
-            ->willReturn($cachedJson);
-
-        $this->jsonParser
-            ->expects($this->once())
-            ->method('decode')
-            ->with($cachedJson)
-            ->willReturn($cachedData);
-
-        $this->cardmarketClient
-            ->expects($this->never())
-            ->method('getProduct');
+        $this->stubCachedPrices(
+            names: [self::KAMIGAWA, self::MODERN_HORIZONS],
+            prices: [self::KAMIGAWA => 18.50, self::MODERN_HORIZONS => 22.00],
+        );
+        $this->productMappings->expects($this->never())->method('productIdsFor');
+        $this->trendPriceProvider->expects($this->never())->method('trendPriceFor');
 
         $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item1, $item2]);
 
@@ -343,74 +70,36 @@ final class PriceTrendRetrieverTest extends TestCase
         $this->assertSame(22.00, $result->prizeWallItems[1]->eurPrice);
     }
 
+    public function testGetPricesFetchesFromCardmarketWhenItemIsNotInCache(): void
+    {
+        $item = new PrizeWallItem(name: self::KAMIGAWA, tixPrice: 10);
+
+        $this->stubCachedPrices(names: [self::KAMIGAWA], prices: []);
+        $this->stubProductIds(names: [self::KAMIGAWA], productIds: [self::KAMIGAWA => 587688]);
+        $this->trendPriceProvider
+            ->expects($this->once())
+            ->method('trendPriceFor')
+            ->with(587688)
+            ->willReturn(18.50);
+
+        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
+
+        $this->assertCount(1, $result->prizeWallItems);
+        $this->assertCount(0, $result->prizeWallItemsNotFound);
+        $this->assertSame(18.50, $result->prizeWallItems[0]->eurPrice);
+    }
+
     public function testGetPricesFetchesTwoItemsFromCardmarketWhenNeitherIsInCache(): void
     {
-        $item1 = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
-        $item2 = new PrizeWallItem(name: 'Modern Horizons 3 Collector Booster', tixPrice: 12);
+        $item1 = new PrizeWallItem(name: self::KAMIGAWA, tixPrice: 10);
+        $item2 = new PrizeWallItem(name: self::MODERN_HORIZONS, tixPrice: 12);
 
-        $emptyCache  = '{}';
-        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"},"Modern Horizons 3 Collector Booster":{"cardmarket_product_id":758481,"cardmarket_name":"Modern Horizons 3 Collector Booster"}}';
-        $mappingData = [
-            'Kamigawa Neon Dynasty Collector Booster' => [
-                'cardmarket_product_id' => 587688,
-                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
-            ],
-            'Modern Horizons 3 Collector Booster' => [
-                'cardmarket_product_id' => 758481,
-                'cardmarket_name'       => 'Modern Horizons 3 Collector Booster',
-            ],
-        ];
-        $kamigawaResponse = [
-            'product' => [
-                'idProduct'  => 587688,
-                'priceGuide' => ['TREND' => 18.50],
-            ],
-        ];
-        $modernHorizonsResponse = [
-            'product' => [
-                'idProduct'  => 758481,
-                'priceGuide' => ['TREND' => 22.00],
-            ],
-        ];
-
-        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
-        $readReturns = [$emptyCache, $mappingJson];
-
-        $this->fileReader
-            ->expects($this->exactly(2))
-            ->method('read')
-            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
-                static $callIndex = 0;
-                $this->assertSame($readPaths[$callIndex], $path);
-
-                return $readReturns[$callIndex++];
-            });
-
-        $decodeInputs  = [$emptyCache, $mappingJson];
-        $decodeReturns = [[], $mappingData];
-
-        $this->jsonParser
-            ->expects($this->exactly(2))
-            ->method('decode')
-            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
-                static $callIndex = 0;
-                $this->assertSame($decodeInputs[$callIndex], $json);
-
-                return $decodeReturns[$callIndex++];
-            });
-
-        $productIds = [587688, 758481];
-        $responses  = [$kamigawaResponse, $modernHorizonsResponse];
-
-        $this->cardmarketClient
-            ->expects($this->exactly(2))
-            ->method('getProduct')
-            ->willReturnCallback(function (int $productId) use ($productIds, $responses): array {
-                static $callIndex = 0;
-                $this->assertSame($productIds[$callIndex], $productId);
-
-                return $responses[$callIndex++];
-            });
+        $this->stubCachedPrices(names: [self::KAMIGAWA, self::MODERN_HORIZONS], prices: []);
+        $this->stubProductIds(
+            names: [self::KAMIGAWA, self::MODERN_HORIZONS],
+            productIds: [self::KAMIGAWA => 587688, self::MODERN_HORIZONS => 758481],
+        );
+        $this->stubTrendPrices([587688 => 18.50, 758481 => 22.00]);
 
         $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item1, $item2]);
 
@@ -422,60 +111,22 @@ final class PriceTrendRetrieverTest extends TestCase
 
     public function testGetPricesReturnsOneItemFromCacheAndOneFromCardmarket(): void
     {
-        $cachedItem = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
-        $cmItem     = new PrizeWallItem(name: 'Modern Horizons 3 Collector Booster', tixPrice: 12);
+        $cachedItem = new PrizeWallItem(name: self::KAMIGAWA, tixPrice: 10);
+        $cmItem     = new PrizeWallItem(name: self::MODERN_HORIZONS, tixPrice: 12);
 
-        $cachedJson = '{"kamigawa neon dynasty collector booster":18.50}';
-        $cachedData = ['kamigawa neon dynasty collector booster' => 18.50];
-        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"},"Modern Horizons 3 Collector Booster":{"cardmarket_product_id":758481,"cardmarket_name":"Modern Horizons 3 Collector Booster"}}';
-        $mappingData = [
-            'Kamigawa Neon Dynasty Collector Booster' => [
-                'cardmarket_product_id' => 587688,
-                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
-            ],
-            'Modern Horizons 3 Collector Booster' => [
-                'cardmarket_product_id' => 758481,
-                'cardmarket_name'       => 'Modern Horizons 3 Collector Booster',
-            ],
-        ];
-        $cmResponse = [
-            'product' => [
-                'idProduct'  => 758481,
-                'priceGuide' => ['TREND' => 22.00],
-            ],
-        ];
-
-        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
-        $readReturns = [$cachedJson, $mappingJson];
-
-        $this->fileReader
-            ->expects($this->exactly(2))
-            ->method('read')
-            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
-                static $callIndex = 0;
-                $this->assertSame($readPaths[$callIndex], $path);
-
-                return $readReturns[$callIndex++];
-            });
-
-        $decodeInputs  = [$cachedJson, $mappingJson];
-        $decodeReturns = [$cachedData, $mappingData];
-
-        $this->jsonParser
-            ->expects($this->exactly(2))
-            ->method('decode')
-            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
-                static $callIndex = 0;
-                $this->assertSame($decodeInputs[$callIndex], $json);
-
-                return $decodeReturns[$callIndex++];
-            });
-
-        $this->cardmarketClient
+        $this->stubCachedPrices(
+            names: [self::KAMIGAWA, self::MODERN_HORIZONS],
+            prices: [self::KAMIGAWA => 18.50],
+        );
+        $this->stubProductIds(
+            names: [self::MODERN_HORIZONS],
+            productIds: [self::MODERN_HORIZONS => 758481],
+        );
+        $this->trendPriceProvider
             ->expects($this->once())
-            ->method('getProduct')
+            ->method('trendPriceFor')
             ->with(758481)
-            ->willReturn($cmResponse);
+            ->willReturn(22.00);
 
         $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$cachedItem, $cmItem]);
 
@@ -485,63 +136,61 @@ final class PriceTrendRetrieverTest extends TestCase
         $this->assertSame(22.00, $result->prizeWallItems[1]->eurPrice);
     }
 
+    public function testGetPricesMovesItemToNotFoundWhenMappingEntryIsMissing(): void
+    {
+        $item = new PrizeWallItem(name: 'Unknown Product', tixPrice: 10);
+
+        $this->stubCachedPrices(names: ['Unknown Product'], prices: []);
+        $this->stubProductIds(names: ['Unknown Product'], productIds: []);
+        $this->trendPriceProvider->expects($this->never())->method('trendPriceFor');
+
+        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
+
+        $this->assertCount(0, $result->prizeWallItems);
+        $this->assertCount(1, $result->prizeWallItemsNotFound);
+        $this->assertSame($item, $result->prizeWallItemsNotFound[0]);
+        $this->assertNull($result->prizeWallItemsNotFound[0]->eurPrice);
+    }
+
+    public function testGetPricesMovesItemToNotFoundWhenNoTrendPriceIsAvailable(): void
+    {
+        $item = new PrizeWallItem(name: self::KAMIGAWA, tixPrice: 10);
+
+        $this->stubCachedPrices(names: [self::KAMIGAWA], prices: []);
+        $this->stubProductIds(names: [self::KAMIGAWA], productIds: [self::KAMIGAWA => 587688]);
+        $this->trendPriceProvider
+            ->expects($this->once())
+            ->method('trendPriceFor')
+            ->with(587688)
+            ->willReturn(null);
+
+        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
+
+        $this->assertCount(0, $result->prizeWallItems);
+        $this->assertCount(1, $result->prizeWallItemsNotFound);
+        $this->assertSame($item, $result->prizeWallItemsNotFound[0]);
+        $this->assertNull($result->prizeWallItemsNotFound[0]->eurPrice);
+    }
+
     public function testGetPricesSplitsItemsAcrossFoundAndNotFoundInOneCall(): void
     {
-        $cachedItem   = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
-        $cmItem       = new PrizeWallItem(name: 'Modern Horizons 3 Collector Booster', tixPrice: 12);
+        $cachedItem   = new PrizeWallItem(name: self::KAMIGAWA, tixPrice: 10);
+        $cmItem       = new PrizeWallItem(name: self::MODERN_HORIZONS, tixPrice: 12);
         $unmappedItem = new PrizeWallItem(name: 'Unknown Product', tixPrice: 8);
 
-        $cachedJson = '{"kamigawa neon dynasty collector booster":18.50}';
-        $cachedData = ['kamigawa neon dynasty collector booster' => 18.50];
-        $mappingJson = '{"Kamigawa Neon Dynasty Collector Booster":{"cardmarket_product_id":587688,"cardmarket_name":"Kamigawa: Neon Dynasty Collector Booster"},"Modern Horizons 3 Collector Booster":{"cardmarket_product_id":758481,"cardmarket_name":"Modern Horizons 3 Collector Booster"}}';
-        $mappingData = [
-            'Kamigawa Neon Dynasty Collector Booster' => [
-                'cardmarket_product_id' => 587688,
-                'cardmarket_name'       => 'Kamigawa: Neon Dynasty Collector Booster',
-            ],
-            'Modern Horizons 3 Collector Booster' => [
-                'cardmarket_product_id' => 758481,
-                'cardmarket_name'       => 'Modern Horizons 3 Collector Booster',
-            ],
-        ];
-        $cmResponse = [
-            'product' => [
-                'idProduct'  => 758481,
-                'priceGuide' => ['TREND' => 22.00],
-            ],
-        ];
-
-        $readPaths   = ['/tmp/prices/pastimeevents.json', '/tmp/mappings/pastimeevents/product_mappings.json'];
-        $readReturns = [$cachedJson, $mappingJson];
-
-        $this->fileReader
-            ->expects($this->exactly(2))
-            ->method('read')
-            ->willReturnCallback(function (string $path) use ($readPaths, $readReturns): string {
-                static $callIndex = 0;
-                $this->assertSame($readPaths[$callIndex], $path);
-
-                return $readReturns[$callIndex++];
-            });
-
-        $decodeInputs  = [$cachedJson, $mappingJson];
-        $decodeReturns = [$cachedData, $mappingData];
-
-        $this->jsonParser
-            ->expects($this->exactly(2))
-            ->method('decode')
-            ->willReturnCallback(function (string $json) use ($decodeInputs, $decodeReturns): array {
-                static $callIndex = 0;
-                $this->assertSame($decodeInputs[$callIndex], $json);
-
-                return $decodeReturns[$callIndex++];
-            });
-
-        $this->cardmarketClient
+        $this->stubCachedPrices(
+            names: [self::KAMIGAWA, self::MODERN_HORIZONS, 'Unknown Product'],
+            prices: [self::KAMIGAWA => 18.50],
+        );
+        $this->stubProductIds(
+            names: [self::MODERN_HORIZONS, 'Unknown Product'],
+            productIds: [self::MODERN_HORIZONS => 758481],
+        );
+        $this->trendPriceProvider
             ->expects($this->once())
-            ->method('getProduct')
+            ->method('trendPriceFor')
             ->with(758481)
-            ->willReturn($cmResponse);
+            ->willReturn(22.00);
 
         $result = $this->retriever->getPrices(
             organizer: 'pastimeevents',
@@ -556,33 +205,42 @@ final class PriceTrendRetrieverTest extends TestCase
         $this->assertNull($result->prizeWallItemsNotFound[0]->eurPrice);
     }
 
-    public function testGetPricesReturnsCachedTrendPriceWithoutCallingCardmarketApi(): void
+    /**
+     * @param string[] $names
+     * @param array<string, float> $prices
+     */
+    private function stubCachedPrices(array $names, array $prices): void
     {
-        $item = new PrizeWallItem(name: 'Kamigawa Neon Dynasty Collector Booster', tixPrice: 10);
-
-        $cachedJson = '{"kamigawa neon dynasty collector booster":18.50}';
-        $cachedData = ['kamigawa neon dynasty collector booster' => 18.50];
-
-        $this->fileReader
+        $this->priceCache
             ->expects($this->once())
-            ->method('read')
-            ->with('/tmp/prices/pastimeevents.json')
-            ->willReturn($cachedJson);
+            ->method('pricesFor')
+            ->with('pastimeevents', $names)
+            ->willReturn($prices);
+    }
 
-        $this->jsonParser
+    /**
+     * @param string[] $names
+     * @param array<string, int> $productIds
+     */
+    private function stubProductIds(array $names, array $productIds): void
+    {
+        $this->productMappings
             ->expects($this->once())
-            ->method('decode')
-            ->with($cachedJson)
-            ->willReturn($cachedData);
+            ->method('productIdsFor')
+            ->with('pastimeevents', $names)
+            ->willReturn($productIds);
+    }
 
-        $this->cardmarketClient
-            ->expects($this->never())
-            ->method('getProduct');
-
-        $result = $this->retriever->getPrices(organizer: 'pastimeevents', items: [$item]);
-
-        $this->assertCount(1, $result->prizeWallItems);
-        $this->assertCount(0, $result->prizeWallItemsNotFound);
-        $this->assertSame(18.50, $result->prizeWallItems[0]->eurPrice);
+    /**
+     * @param array<int, float> $trendPricesByProductId
+     */
+    private function stubTrendPrices(array $trendPricesByProductId): void
+    {
+        $this->trendPriceProvider
+            ->expects($this->exactly(count($trendPricesByProductId)))
+            ->method('trendPriceFor')
+            ->willReturnCallback(
+                static fn (int $productId): ?float => $trendPricesByProductId[$productId] ?? null,
+            );
     }
 }
